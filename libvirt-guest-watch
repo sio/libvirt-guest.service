@@ -69,7 +69,7 @@ get_status() {
             IGNORECASE = 1;
             rc = 1;
         }
-        /state: / {
+        /^state: / {
             print $2;
             rc = 0;
         }
