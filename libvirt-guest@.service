@@ -1,0 +1,24 @@
+[Unit]
+Description=Libvirt Guest Domain: %i
+Wants=libvirtd.service
+After=network.target
+Documentation=libvirt-guest-watch --help
+Documentation=https://github.com/sio/libvirt-guest.service
+
+
+[Install]
+WantedBy=multi-user.target
+
+
+[Service]
+Type=notify
+NotifyAccess=exec
+ExecStart=virsh start %i
+ExecStart=libvirt-guest-watch %i
+ExecStop=virsh shutdown %i
+
+# Useful environment variables to be provided by EnvironmentFile:
+#   LIBVIRT_DEFAULT_URI
+#   HEALTHCHECK_CMD
+EnvironmentFile=-/etc/default/libvirt-guest-watch/default.env
+EnvironmentFile=-/etc/default/libvirt-guest-watch/%i
