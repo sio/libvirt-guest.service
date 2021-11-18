@@ -1,0 +1,84 @@
+#!/bin/bash
+#
+# Watch status of libvirt guest and notify systemd about changes
+#
+set -euo pipefail
+IFS=$'\n\t'
+
+
+GUEST="$1"
+
+
+RC_SUCCESS=0
+RC_GUEST_ERROR=101
+RC_SCRIPT_ERROR=109
+
+
+usage() {
+    local message=(
+        "usage: $0 GUEST"
+        "    Watch status of libvirt guest and notify systemd about changes"
+        ""
+        "Arguments:"
+        "    GUEST (required)"
+        "        Libvirt domain name for the guest"
+        ""
+        "Environment variables:"
+        "    HEALTHCHECK_CMD (optional)"
+        "        A command to confirm that guest is healthy."
+        "        If this command returns non-zero exit code the guest is considered unhealthy:"
+        "        either not yet ready (if domain exists but no healthy responses were recorded yet)"
+        "        or failed (if domain exists and was healthy before)"
+        "    LIBVIRT_DEFAULT_URI (optional)"
+        "        Libvirt daemon connection string"
+        ""
+        "Exit code:"
+        "    $RC_SUCCESS:   Successful guest shutdown"
+        "    $RC_GUEST_ERROR: Guest shutdown with errors"
+        "    $RC_SCRIPT_ERROR: Internal script error"
+    )
+    printf "%s\n" "${message[@]}"
+}
+
+
+if [[ -z "$GUEST" || "$GUEST" =~ ^(--help|-h)$ ]]
+then
+    usage 1>&2
+    exit $RC_SCRIPT_ERROR
+fi
+
+
+virsh() {
+    LC_ALL=C command virsh "$@" </dev/null
+}
+
+
+get_status() {
+    # Return libvirt domain status as specified in `virsh dominfo`:
+    #   blocked, running, paused, shutdown, dying, crashed, inactive
+    # or one of extra values:
+    #   undefined    for non-existent domains
+    #   unknown      for failure to parse virsh output
+    local guest="$1"
+    virsh domid "$guest" >/dev/null || {
+        echo "undefined"
+        return
+    }
+    virsh dominfo "$guest" | awk '
+        BEGIN {
+            rc = 1;
+        }
+        /state: / {
+            print $2;
+            rc = 0;
+        }
+        END {
+            if (rc == 1) {
+                print "unknown";
+            };
+        }
+    '
+}
+
+
+get_status $GUEST
