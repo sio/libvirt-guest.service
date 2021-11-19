@@ -55,7 +55,7 @@ virsh() {
 
 get_status() {
     # Return libvirt domain status as specified in `virsh dominfo`:
-    #   blocked, running, paused, shutdown, dying, crashed, inactive
+    #   blocked, running, paused, in shutdown, shut off, dying, crashed, inactive
     # or one of extra values:
     #   undefined    for non-existent domains
     #   unknown      for failure to parse virsh output
@@ -69,7 +69,9 @@ get_status() {
             rc = 1;
         }
         tolower($0) ~ /^state: / {
-            print $2;
+            $1 = "";
+            sub(/^[ \t]+|[ \t]+$/, ""); # trim whitespace
+            print $0;
             rc = 0;
         }
         END {
