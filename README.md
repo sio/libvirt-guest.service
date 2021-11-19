@@ -20,3 +20,6 @@ Libvirt VM state - this project will be helpful.
   smaller than in `examples/event-test.py`
 - [sd_notify() from Python](https://github.com/stigok/sd-notify/blob/master/sd_notify.py) -
   it's simpler than you may think! Just some bytes sent over Unix socket
+- [Systemd DBus API](https://wiki.freedesktop.org/www/Software/systemd/dbus/)
+- [python3-dbus tutorial](https://dbus.freedesktop.org/doc/dbus-python/tutorial.html),
+  [example](https://stackoverflow.com/questions/42088406/starting-a-users-systemd-service-via-python-and-dbus)
