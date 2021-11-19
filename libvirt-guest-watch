@@ -6,9 +6,6 @@ set -euo pipefail
 IFS=$'\n\t'
 
 
-GUEST="$1"
-
-
 RC_SUCCESS=0
 RC_GUEST_ERROR=101
 RC_SCRIPT_ERROR=109
@@ -41,11 +38,13 @@ usage() {
 }
 
 
-if [[ -z "$GUEST" || "$GUEST" =~ ^(--help|-h)$ ]]
-then
-    usage 1>&2
-    exit $RC_SCRIPT_ERROR
-fi
+validate_args() {
+    if [[ -z "$1" || "$1" =~ ^(--help|-h|-.*)$ || "$#" != 1 ]]
+    then
+        usage 1>&2
+        exit $RC_SCRIPT_ERROR
+    fi
+}
 
 
 virsh() {
@@ -83,4 +82,17 @@ get_status() {
 }
 
 
-get_status $GUEST
+main() {
+    validate_args "$@"
+
+    GUEST="$1"
+    get_status $GUEST
+}
+
+
+# if __name__ == '__main__'  //  <https://stackoverflow.com/a/45988155>
+get_caller() { echo "${FUNCNAME[1]}"; }
+if [[ "$(get_caller)" == "main" ]]
+then
+    main "$@"
+fi
