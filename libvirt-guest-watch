@@ -66,10 +66,9 @@ get_status() {
     }
     virsh dominfo "$guest" | awk '
         BEGIN {
-            IGNORECASE = 1;
             rc = 1;
         }
-        /^state: / {
+        tolower($0) ~ /^state: / {
             print $2;
             rc = 0;
         }
