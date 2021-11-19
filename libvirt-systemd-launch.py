@@ -45,7 +45,7 @@ def parse_args(*a, **ka):
         default=os.getenv(ENV['timeout'], 120),
         metavar='SECONDS',
         help=(
-            f'Timeout (in seconds) before action is considered failed. '
+            f'timeout (in seconds) before action is considered failed. '
             f'Default: ${ENV["timeout"]} or 120'
         )
     )
