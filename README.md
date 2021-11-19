@@ -18,3 +18,5 @@ Libvirt VM state - this project will be helpful.
 
 - [Minimal event listener](https://stackoverflow.com/questions/8767834) -
   smaller than in `examples/event-test.py`
+- [sd_notify() from Python](https://github.com/stigok/sd-notify/blob/master/sd_notify.py) -
+  it's simpler than you may think! Just some bytes sent over Unix socket
