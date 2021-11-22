@@ -13,6 +13,7 @@ Libvirt VM state - this project will be helpful.
 - [Libvirt Python API](https://libvirt.org/python.html)
 - [libvirt-python examples](https://gitlab.com/libvirt/libvirt-python/-/tree/master/examples)
 - [Libvirt Domain Module](https://libvirt.org/html/libvirt-libvirt-domain.html)
+- [Libvirt Application Development Guide Using Python](https://libvirt.org/docs/libvirt-appdev-guide-python/en-US/html/)
 
 #### Event listener
 
