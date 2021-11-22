@@ -11,14 +11,17 @@ WantedBy=multi-user.target
 
 
 [Service]
-Type=notify
-NotifyAccess=exec
-ExecStart=virsh start %i
-ExecStart=libvirt-guest-watch %i
-ExecStop=virsh shutdown %i
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+#Type=notify
+#NotifyAccess=exec
+#ExecStart=virsh start %i
+#ExecStart=libvirt-guest-watch %i
+#ExecStop=virsh shutdown %i
 
 # Useful environment variables to be provided by EnvironmentFile:
 #   LIBVIRT_DEFAULT_URI
 #   HEALTHCHECK_CMD
-EnvironmentFile=-/etc/default/libvirt-guest-watch/default.env
-EnvironmentFile=-/etc/default/libvirt-guest-watch/%i
+#EnvironmentFile=-/etc/default/libvirt-guest-watch/default.env
+#EnvironmentFile=-/etc/default/libvirt-guest-watch/%i
