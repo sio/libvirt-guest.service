@@ -106,15 +106,6 @@ def systemd_parse_unit_name(unit_name: str):
     return prefix, suffix, unit_type
 
 
-def libvirt_get_initial_state(connection):
-    '''Translate initial libvirt state into systemd units state'''
-    state = ThreadSafeKeyValue()
-    for domain in connection.listAllDomains():
-        name = domain.name()
-        state[name] = 'active' if domain.isActive() else 'inactive'
-    return state
-
-
 class SystemdUnitManager:
     '''DBus wrapper for systemd API'''
 
@@ -208,14 +199,36 @@ class SystemdUnitWrapperMethod:
         return getattr(self.parent._dbus_iface, self.name)(*a, **ka)
 
 
+class LibvirtDomainManager:
+    '''Wrapper for Libvirt API'''
+
+    def __init__(self):
+        self.connection = libvirt.openReadOnly()
+        self._state = ThreadSafeKeyValue()
+        self._lock = threading.RLock()
+        self.reload_state()
+
+    @property
+    def state(self):
+        '''Mapping of domain names to status strings'''
+        return ReadOnlyDict(self._state)
+
+    def reload_state(self):
+        '''Reload all domains state from scratch'''
+        state = self._state
+        with self._lock:      # no domain actions are to be performed
+            with state._lock: # no state reads either
+                state.clear()
+                for domain in self.connection.listAllDomains():
+                    name = domain.name()
+                    state[name] = 'active' if domain.isActive() else 'inactive'
 
 
 def main():
     template_prefix = 'libvirt-guest'
-    libvirt_connection = libvirt.openReadOnly()
-    libvirt_state = libvirt_get_initial_state(libvirt_connection)
+    libvirt = LibvirtDomainManager()
     systemd = SystemdUnitManager(template_prefix)
-    systemd.set_initial_state(libvirt_state)
+    systemd.set_initial_state(libvirt.state)
     #manager.Subscribe()
     #for unit in manager.ListUnits():
     #    print(unit)
