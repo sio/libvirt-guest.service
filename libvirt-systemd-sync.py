@@ -209,6 +209,7 @@ class LibvirtActionLog:
         self._max_length_seconds = max_length_seconds
         self._log = ThreadSafeKeyValue()
         self._lock = threading.RLock()
+        self._last_update = 0
         self._clear()
 
     def now(self):
@@ -234,16 +235,17 @@ class LibvirtActionLog:
             if self.now() - self._last_update > self._max_length_seconds:
                 self._clear()
 
-    def _update(self):
+    def _update(self, cleanup=True):
         '''Save last update timestamp'''
         with self._lock:
-            self._cleanup()
+            if cleanup:
+                self._cleanup()
             self._last_update = self.now()
 
     def _clear(self):
         with self._lock:
             self._log.clear()
-            self._update()
+            self._update(cleanup=False)
 
 
 class LibvirtDomainManager:
