@@ -12,9 +12,11 @@ import threading
 import time
 
 from collections.abc import Mapping, MutableMapping
+from concurrent.futures import ThreadPoolExecutor
 from dbus.mainloop.glib import DBusGMainLoop  # python3-dbus
 from enum import IntEnum
 from gi.repository import GLib  # python3-gi
+from queue import Queue
 
 from pprint import pformat  # debug
 
@@ -200,17 +202,66 @@ class SystemdUnitWrapperMethod:
         return getattr(self.parent._dbus_iface, self.name)(*a, **ka)
 
 
+class LibvirtActionLog:
+    '''In-memory log of past Libvirt actions'''
+
+    def __init__(self, max_length_seconds=60):
+        self._max_length_seconds = max_length_seconds
+        self._log = ThreadSafeKeyValue()
+        self._lock = threading.RLock()
+        self._clear()
+
+    def now(self):
+        return time.monotonic()
+
+    def new(self, key):
+        '''Record a new timestamp for key'''
+        with self._lock:
+            if key in self._log:
+                self._log[key].append(self.now())
+            else:
+                self._log[key] = [self.now(),]
+            self._update()
+
+    def last(self, key):
+        '''Latest timestamp for key'''
+        with self._lock:
+            return self._log.get(key, [0])[-1]
+
+    def _cleanup(self):
+        '''Remove outdated log entries'''
+        with self._lock:
+            if self.now() - self._last_update > self._max_length_seconds:
+                self._clear()
+
+    def _update(self):
+        '''Save last update timestamp'''
+        with self._lock:
+            self._cleanup()
+            self._last_update = self.now()
+
+    def _clear(self):
+        with self._lock:
+            self._log.clear()
+            self._update()
+
+
 class LibvirtDomainManager:
     '''Wrapper for Libvirt API'''
 
     TIMEOUT_SEC = 120
     CHECK_DELAY_SEC = 1
+    CONSECUTIVE_ACTION_THRESHOLD_SEC = 3
 
     def __init__(self):
         self.connection = libvirt.open()
         self._state = ThreadSafeKeyValue()
         self._lock = threading.RLock()
+        self._action_queue = Queue()
+        self._action_log = LibvirtActionLog()
         self.reload_state()
+        self.action_thread = threading.Thread(target=self.action_loop, daemon=True)
+        self.action_thread.start()
 
     @property
     def state(self):
@@ -227,6 +278,37 @@ class LibvirtDomainManager:
                     name = domain.name()
                     state[name] = 'active' if domain.isActive() else 'inactive'
 
+    def action_loop(self):
+        '''
+        Loop forever executing queued actions as they are added to
+        self._action_queue
+        '''
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            for args in iter(self._action_queue.get, None):  # endless loop
+                action_log = self._action_log
+                if action_log.now() - action_log.last(args) <= self.CONSECUTIVE_ACTION_THRESHOLD_SEC:
+                    log.debug(f'Ignoring action because of consecutive execution threshold: {" ".join(args)}')
+                    continue
+                log.debug(f'Adding action to Libvirt queue: {" ".join(args)}')
+                action_log.new(args)
+                executor.submit(self._action, *args)
+
+    def start(self, domain_name: str):
+        '''
+        Start Libvirt domain
+        (non-blocking, all work is done in background thread)
+        '''
+        args = ('start', domain_name)
+        self._action_queue.put(args)
+
+    def stop(self, domain_name: str):
+        '''
+        Stop Libvirt domain
+        (non-blocking, all work is done in background thread)
+        '''
+        args = ('stop', domain_name)
+        self._action_queue.put(args)
+
     def _start(self, domain_name: str):
         '''
         Initiate Libvirt domain startup
@@ -236,6 +318,7 @@ class LibvirtDomainManager:
             domain = self.connection.lookupByName(domain_name)
             if domain.isActive():
                 return
+            log.info(f'Sending start command for domain: {domain_name}')
             if domain.create() == 0:
                 return
             raise RuntimeError(f'failed to create domain: {domain_name}')
@@ -250,11 +333,12 @@ class LibvirtDomainManager:
             domain = self.connection.lookupByName(domain_name)
             if not domain.isActive():
                 return
+            log.info(f'Sending shutdown signal for domain: {domain_name}')
             if domain.shutdown() == 0:
                 return
             raise RuntimeError(f'failed to shutdown domain: {domain_name}')
 
-    def control(self, action: str, domain_name: str):
+    def _action(self, action: str, domain_name: str):
         '''
         Initiate start/stop domain and wait for the action to complete.
         This function blocks until domain reaches the desired state, so it may
@@ -275,6 +359,7 @@ class LibvirtDomainManager:
             time.sleep(self.CHECK_DELAY_SEC)
             if action == 'stop':  # guest may have been not ready to process ACPI events before
                 execute(domain_name)
+        log.info(f'Domain {domain_name} has reached target state: {target[action]}')
 
 
 
