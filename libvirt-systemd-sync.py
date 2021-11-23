@@ -9,6 +9,7 @@ import logging
 import os.path
 import re
 import threading
+import time
 
 from collections.abc import Mapping, MutableMapping
 from dbus.mainloop.glib import DBusGMainLoop  # python3-dbus
@@ -202,8 +203,11 @@ class SystemdUnitWrapperMethod:
 class LibvirtDomainManager:
     '''Wrapper for Libvirt API'''
 
+    TIMEOUT_SEC = 120
+    CHECK_DELAY_SEC = 1
+
     def __init__(self):
-        self.connection = libvirt.openReadOnly()
+        self.connection = libvirt.open()
         self._state = ThreadSafeKeyValue()
         self._lock = threading.RLock()
         self.reload_state()
@@ -222,6 +226,57 @@ class LibvirtDomainManager:
                 for domain in self.connection.listAllDomains():
                     name = domain.name()
                     state[name] = 'active' if domain.isActive() else 'inactive'
+
+    def _start(self, domain_name: str):
+        '''
+        Initiate Libvirt domain startup
+        This function is almost always non-blocking
+        '''
+        with self._lock:
+            domain = self.connection.lookupByName(domain_name)
+            if domain.isActive():
+                return
+            if domain.create() == 0:
+                return
+            raise RuntimeError(f'failed to create domain: {domain_name}')
+
+    def _stop(self, domain_name: str):
+        '''
+        Initiate Libvirt domain shutdown
+        This function is almost always non-blocking, but it does not ensure
+        that domain have reached desired state.
+        '''
+        with self._lock:
+            domain = self.connection.lookupByName(domain_name)
+            if not domain.isActive():
+                return
+            if domain.shutdown() == 0:
+                return
+            raise RuntimeError(f'failed to shutdown domain: {domain_name}')
+
+    def control(self, action: str, domain_name: str):
+        '''
+        Initiate start/stop domain and wait for the action to complete.
+        This function blocks until domain reaches the desired state, so it may
+        be benefitial to spawn it off in a separate thread.
+        '''
+        target = {
+            'start': 'active',
+            'stop': 'inactive',
+        }
+        if action not in target:
+            raise ValueError(f'invalid action: {action}')
+        execute = getattr(self, f'_{action}')
+        start = time.monotonic()
+        execute(domain_name)
+        while not self.state[domain_name] == target[action]:
+            if time.monotonic() > start + self.TIMEOUT_SEC:
+                raise RuntimeError(f'domain {action} took longer than {self.TIMEOUT_SEC} seconds: {domain_name}')
+            time.sleep(self.CHECK_DELAY_SEC)
+            if action == 'stop':  # guest may have been not ready to process ACPI events before
+                execute(domain_name)
+
+
 
 
 def main():
