@@ -22,22 +22,6 @@ log = logging.getLogger('libvirt-systemd-sync')
 log.level = logging.DEBUG  # debug
 
 
-class LibvirtDomainState(IntEnum):
-    '''
-    Integer based domain state
-    https://libvirt.org/html/libvirt-libvirt-domain.html#virDomainState
-    '''
-    NOSTATE     = 0
-    RUNNING     = 1
-    BLOCKED     = 2
-    PAUSED      = 3
-    SHUTDOWN    = 4
-    SHUTOFF     = 5
-    CRASHED     = 6
-    PMSUSPENDED = 7
-    LAST        = 8
-
-
 class ThreadSafeKeyValue:
     '''
     Even though Python built-ins should be thread safe thanks to GIL,
@@ -96,17 +80,6 @@ def systemd_parse_unit_name(unit_name: str):
         prefix = unit_name
         suffix = ''
     return prefix, suffix, unit_type
-
-
-def libvirt_event_watch(template_prefix):
-    '''
-    Listen for libvirt events
-    and translate them into systemd units state changes
-    '''
-    connection = libvirt.openReadOnly()
-    state = libvirt_get_initial_state(connection)
-    systemd_unit_watch(template_prefix, libvirt_state=state)
-    print(last_known_state)
 
 
 def libvirt_get_initial_state(connection):
@@ -211,12 +184,12 @@ class SystemdUnitWrapperMethod:
         return getattr(self.parent._dbus_iface, self.name)(*a, **ka)
 
 
-def systemd_unit_watch(template_prefix, libvirt_state):
-    '''
-    Listen for systemd unit state changes
-    and translate them into libvirt domain start/stop actions
-    '''
 
+
+def main():
+    template_prefix = 'libvirt-guest'
+    libvirt_connection = libvirt.openReadOnly()
+    libvirt_state = libvirt_get_initial_state(libvirt_connection)
     systemd = SystemdUnitManager(template_prefix)
     systemd.set_initial_state(libvirt_state)
     #manager.Subscribe()
@@ -251,9 +224,6 @@ def systemd_unit_watch(template_prefix, libvirt_state):
     systemd.event_loop.run()
 
 
-def main():
-    #systemd_unit_watch('libvirt-guest@')
-    libvirt_event_watch('libvirt-guest')
 
 
 if __name__ == '__main__':
