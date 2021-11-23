@@ -424,6 +424,7 @@ def main():
             return
         if state[systemd_state] == libvirtd.state.get(domain):
             return
+        log.debug(f'Systemd event: {systemd_state} {domain}')
         if state[systemd_state] == 'active':
             libvirtd.start(domain)
         elif state[systemd_state] == 'inactive':
