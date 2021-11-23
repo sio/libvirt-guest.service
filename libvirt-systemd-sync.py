@@ -368,9 +368,9 @@ class LibvirtDomainManager:
 
 def main():
     template_prefix = 'libvirt-guest'
-    libvirt = LibvirtDomainManager()
+    libvirtd = LibvirtDomainManager()
     systemd = SystemdUnitManager(template_prefix)
-    systemd.set_initial_state(libvirt.state)
+    systemd.set_initial_state(libvirtd.state)
 
     def dbus_signal_handler(interface_name, changed_properties, invalidated_properties, path, **kwargs):
         if interface_name != 'org.freedesktop.systemd1.Unit':
@@ -389,12 +389,12 @@ def main():
         if systemd_state not in state:
             log.error(f'dbus_signal_handler received unknown unit state: {systemd_state}')
             return
-        if state[systemd_state] == libvirt.state.get(domain):
+        if state[systemd_state] == libvirtd.state.get(domain):
             return
         if state[systemd_state] == 'active':
-            libvirt.start(domain)
+            libvirtd.start(domain)
         elif state[systemd_state] == 'inactive':
-            libvirt.stop(domain)
+            libvirtd.stop(domain)
         else:
             raise RuntimeError(f'impossible branching with state: {state[systemd_state]} ({systemd_state})')
 
