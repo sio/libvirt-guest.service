@@ -371,9 +371,6 @@ def main():
     libvirt = LibvirtDomainManager()
     systemd = SystemdUnitManager(template_prefix)
     systemd.set_initial_state(libvirt.state)
-    #manager.Subscribe()
-    #for unit in manager.ListUnits():
-    #    print(unit)
 
     def dbus_signal_handler(interface_name, changed_properties, invalidated_properties, path, **kwargs):
         if interface_name != 'org.freedesktop.systemd1.Unit':
@@ -381,11 +378,25 @@ def main():
         if 'ActiveState' not in changed_properties:
             return
         prefix, domain, _ = systemd_parse_unit_name(systemd_unescape(os.path.basename(path)))
-        if prefix != template_prefix.rstrip('@'):
+        if prefix != template_prefix:
             return
-        if changed_properties['ActiveState'] == libvirt_state.get(domain):
+        systemd_state = changed_properties['ActiveState']
+        state = {
+            'activating': 'active',
+            'active': 'active',
+            'inactive': 'inactive',
+        }
+        if systemd_state not in state:
+            log.error(f'dbus_signal_handler received unknown unit state: {systemd_state}')
             return
-        print(f'\nReceived signal from DBus:\n{pformat(locals())}')
+        if state[systemd_state] == libvirt.state.get(domain):
+            return
+        if state[systemd_state] == 'active':
+            libvirt.start(domain)
+        elif state[systemd_state] == 'inactive':
+            libvirt.stop(domain)
+        else:
+            raise RuntimeError(f'impossible branching with state: {state[systemd_state]} ({systemd_state})')
 
     systemd.dbus.add_signal_receiver(
         handler_function=dbus_signal_handler,
@@ -393,12 +404,7 @@ def main():
         dbus_interface='org.freedesktop.DBus.Properties',
         bus_name=None,
         path=None,
-        sender_keyword='sender',
-        destination_keyword='destination',
-        interface_keyword='interface',
-        member_keyword='member',
         path_keyword='path',
-        message_keyword='message',
     )
     systemd.event_loop.run()
 
