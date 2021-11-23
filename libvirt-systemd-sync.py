@@ -134,14 +134,14 @@ class SystemdUnitManager:
         for domain, state in libvirt_state.items():
             unit_name = f'{self.template_prefix}@{domain}.service'
             unit = self.unit(unit_name)
-            log.debug(f'Initial systemd state for {unit_name}: {unit["ActiveState"]}')
+            log.debug(f'{self.__class__.__name__}: initial state for {unit_name}: {unit["ActiveState"]}')
             if state == unit['ActiveState']:
                 continue
             if state == 'active':
-                log.debug(f'Systemd state does not match libvirt. Starting unit: {unit_name}')
+                log.debug(f'{self.__class__.__name__}: unit state does not match libvirt. Starting {unit_name}')
                 unit.Start('fail')
             elif state == 'inactive':
-                log.debug(f'Systemd state does not match libvirt. Stopping unit: {unit_name}')
+                log.debug(f'{self.__class__.__name__}: unit state does not match libvirt. Stopping {unit_name}')
                 unit.Stop('fail')
             else:
                 raise ValueError('unhandled state for domain {domain}: {state}')
@@ -156,13 +156,13 @@ class SystemdUnitManager:
                 continue
             unit = self.unit(name)
             if libvirt_status == 'active':
-                log.warn(f'Active domain should have been handled already, fixing: {domain}')
+                log.warn(f'{self.__class__.__name__}: unexpected inactive unit, fixing: {name}')
                 unit.Start('fail')
             elif libvirt_status == 'inactive':
-                log.warn(f'Inactive domain should have been handled already, fixing: {domain}')
+                log.warn(f'{self.__class__.__name__}: unexpected active unit, fixing: {name}')
                 unit.Stop('fail')
             elif libvirt_status is None:
-                log.debug(f'There is no libvirt domain for unit {name}. Stopping unit')
+                log.debug(f'{self.__class__.__name__}: there is no libvirt domain for {name}. Stopping unit')
                 unit.Stop('fail')
             else:
                 raise ValueError('unhandled state for domain {domain}: {libvirt_status}')
@@ -287,9 +287,9 @@ class LibvirtDomainManager:
             for args in iter(self._action_queue.get, None):  # endless loop
                 action_log = self._action_log
                 if action_log.now() - action_log.last(args) <= self.CONSECUTIVE_ACTION_THRESHOLD_SEC:
-                    log.debug(f'Ignoring action because of consecutive execution threshold: {" ".join(args)}')
+                    log.debug(f'{self.__class__.__name__}: ignoring action because of repetition threshold: {" ".join(args)}')
                     continue
-                log.debug(f'Adding action to Libvirt queue: {" ".join(args)}')
+                log.debug(f'{self.__class__.__name__}: adding action to queue: {" ".join(args)}')
                 action_log.new(args)
                 executor.submit(self._action, *args)
 
@@ -318,7 +318,7 @@ class LibvirtDomainManager:
             domain = self.connection.lookupByName(domain_name)
             if domain.isActive():
                 return
-            log.info(f'Sending start command for domain: {domain_name}')
+            log.info(f'{self.__class__.__name__}: sending start command for {domain_name}')
             if domain.create() == 0:
                 return
             raise RuntimeError(f'failed to create domain: {domain_name}')
@@ -333,7 +333,7 @@ class LibvirtDomainManager:
             domain = self.connection.lookupByName(domain_name)
             if not domain.isActive():
                 return
-            log.info(f'Sending shutdown signal for domain: {domain_name}')
+            log.info(f'{self.__class__.__name__}: sending shutdown signal for {domain_name}')
             if domain.shutdown() == 0:
                 return
             raise RuntimeError(f'failed to shutdown domain: {domain_name}')
@@ -359,7 +359,7 @@ class LibvirtDomainManager:
             time.sleep(self.CHECK_DELAY_SEC)
             if action == 'stop':  # guest may have been not ready to process ACPI events before
                 execute(domain_name)
-        log.info(f'Domain {domain_name} has reached target state: {target[action]}')
+        log.info(f'{self.__class__.__name__}: {domain_name} has reached target state: {target[action]}')
 
 
 
