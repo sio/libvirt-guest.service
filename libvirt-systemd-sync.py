@@ -120,6 +120,27 @@ class SystemdUnitManager:
         self.daemon = self.dbus_object('/org/freedesktop/systemd1')
         self.manager = dbus.Interface(self.daemon, 'org.freedesktop.systemd1.Manager')
 
+    def _unit_name(self, domain_name: str):
+        '''Translate Libvirt domain name to Systemd unit name'''
+        return f'{self.template_prefix}@{domain_name}.service'
+
+    def start(self, domain_name: str):
+        '''Start systemd unit that corresponds to Libvirt domain'''
+        unit = self.unit(self._unit_name(domain_name))
+        if unit['ActiveState'] != 'active':
+            unit.Start('fail')
+
+    def restart(self, domain_name: str):
+        '''Restart systemd unit that corresponds to Libvirt domain'''
+        unit = self.unit(self._unit_name(domain_name))
+        unit.Restart('fail')
+
+    def stop(self, domain_name: str):
+        '''Stop systemd unit that corresponds to Libvirt domain'''
+        unit = self.unit(self._unit_name(domain_name))
+        if unit['ActiveState'] != 'inactive':
+            unit.Stop('fail')
+
     def dbus_object(self, path: str):
         return self.dbus.get_object('org.freedesktop.systemd1', path)
 
@@ -132,16 +153,16 @@ class SystemdUnitManager:
     def set_initial_state(self, libvirt_state):
         '''Apply initial state of systemd units'''
         for domain, state in libvirt_state.items():
-            unit_name = f'{self.template_prefix}@{domain}.service'
+            unit_name = self._unit_name(domain)
             unit = self.unit(unit_name)
             log.debug(f'{self.__class__.__name__}: initial state for {unit_name}: {unit["ActiveState"]}')
             if state == unit['ActiveState']:
                 continue
             if state == 'active':
-                log.debug(f'{self.__class__.__name__}: unit state does not match libvirt. Starting {unit_name}')
+                log.debug(f'{self.__class__.__name__}: starting {unit_name} to match libvirt state')
                 unit.Start('fail')
             elif state == 'inactive':
-                log.debug(f'{self.__class__.__name__}: unit state does not match libvirt. Stopping {unit_name}')
+                log.debug(f'{self.__class__.__name__}: stopping {unit_name} to match libvirt state')
                 unit.Stop('fail')
             else:
                 raise ValueError('unhandled state for domain {domain}: {state}')
@@ -248,6 +269,12 @@ class LibvirtActionLog:
             self._update(cleanup=False)
 
 
+def libvirt_eventloop_start():
+    libvirt.virEventRegisterDefaultImpl()
+    while True:
+        libvirt.virEventRunDefaultImpl()
+
+
 class LibvirtDomainManager:
     '''Wrapper for Libvirt API'''
 
@@ -256,6 +283,8 @@ class LibvirtDomainManager:
     CONSECUTIVE_ACTION_THRESHOLD_SEC = 3
 
     def __init__(self):
+        self.event_thread = threading.Thread(target=libvirt_eventloop_start, daemon=True)
+        self.event_thread.start()
         self.connection = libvirt.open()
         self._state = ThreadSafeKeyValue()
         self._lock = threading.RLock()
@@ -290,6 +319,10 @@ class LibvirtDomainManager:
                 action_log = self._action_log
                 if action_log.now() - action_log.last(args) <= self.CONSECUTIVE_ACTION_THRESHOLD_SEC:
                     log.debug(f'{self.__class__.__name__}: ignoring action because of repetition threshold: {" ".join(args)}')
+                    continue
+                if  args[0] == 'stop' \
+                and action_log.now() - action_log.last(('start', args[1])) <= self.CONSECUTIVE_ACTION_THRESHOLD_SEC:
+                    log.debug(f'{self.__class__.__name__}: ignoring rapid start-stop sequence: {args[1]}')
                     continue
                 log.debug(f'{self.__class__.__name__}: adding action to queue: {" ".join(args)}')
                 action_log.new(args)
@@ -398,6 +431,7 @@ def main():
         else:
             raise RuntimeError(f'impossible branching with state: {state[systemd_state]} ({systemd_state})')
 
+
     systemd.dbus.add_signal_receiver(
         handler_function=dbus_signal_handler,
         signal_name='PropertiesChanged',
@@ -406,6 +440,39 @@ def main():
         path=None,
         path_keyword='path',
     )
+
+    def libvirt_event_lifecycle(conn, dom, state: int, reason: int, *a, **ka):
+        if state == libvirt.VIR_DOMAIN_EVENT_STARTED:
+            libvirtd._state[dom.name()] = 'active'
+            libvirtd._action_log.new(('start', dom.name()))
+            systemd.start(dom.name())
+            log.debug(f'Libvirt start event for {dom.name()}, updating systemd unit state')
+        elif state == libvirt.VIR_DOMAIN_EVENT_STOPPED:
+            libvirtd._state[dom.name()] = 'inactive'
+            libvirtd._action_log.new(('stop', dom.name()))
+            systemd.stop(dom.name())
+            log.debug(f'Libvirt stop event for {dom.name()}, updating systemd unit state')
+
+    def libvirt_event_reboot(conn, dom, opaque, *a, **ka):
+        libvirtd._state[dom.name()] = 'active'
+        libvirtd._action_log.new(('start', dom.name()))
+        libvirtd._action_log.new(('stop', dom.name()))
+        systemd.restart(dom.name())
+        log.info(f'Libvirt reboot event for {dom.name()}, triggering systemd unit restart')
+
+    libvirtd.connection.domainEventRegisterAny(
+        dom=None,
+        eventID=libvirt.VIR_DOMAIN_EVENT_ID_LIFECYCLE,
+        cb=libvirt_event_lifecycle,
+        opaque=2,
+    )
+    libvirtd.connection.domainEventRegisterAny(
+        dom=None,
+        eventID=libvirt.VIR_DOMAIN_EVENT_ID_REBOOT,
+        cb=libvirt_event_reboot,
+        opaque=None,
+    )
+
     systemd.event_loop.run()
 
 
