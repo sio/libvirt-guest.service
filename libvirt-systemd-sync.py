@@ -10,6 +10,7 @@ import os.path
 import re
 import threading
 
+from collections.abc import Mapping, MutableMapping
 from dbus.mainloop.glib import DBusGMainLoop  # python3-dbus
 from enum import IntEnum
 from gi.repository import GLib  # python3-gi
@@ -22,7 +23,7 @@ log = logging.getLogger('libvirt-systemd-sync')
 log.level = logging.DEBUG  # debug
 
 
-class ThreadSafeKeyValue:
+class ThreadSafeKeyValue(MutableMapping):
     '''
     Even though Python built-ins should be thread safe thanks to GIL,
     having explicit thread safety is better
@@ -36,19 +37,23 @@ class ThreadSafeKeyValue:
         with self._lock:
             return self._storage[key]
 
-    def get(self, key, **ka):
-        with self._lock:
-            return self._storage.get(key, **ka)
-
     def __setitem__(self, key, value):
         with self._lock:
             self._storage[key] = value
 
-    def items(self):
+    def __delitem__(self, key):
         with self._lock:
-            return list(self._storage.items())
+            self._storage.pop(key)
 
-    def __in__(self, key):
+    def __len__(self):
+        with self._lock:
+            return len(self._storage)
+
+    def __iter__(self):
+        with self._lock:
+            return iter(self._storage)
+
+    def __contains__(self, key):
         with self._lock:
             return key in self._storage
 
@@ -59,6 +64,25 @@ class ThreadSafeKeyValue:
     def __repr__(self):
         with self._lock:
             return f'<{self.__class__.__name__}({self._storage})>'
+
+
+class ReadOnlyDict(Mapping):
+    '''A dictionary-like object wrapper that prevents accidental modification'''
+
+    def __init__(self, dictionary):
+        self._storage = dictionary
+
+    def __getitem__(self, key):
+        return self._storage[key]
+
+    def __len__(self):
+        return len(self._storage)
+
+    def __iter__(self):
+        return iter(self._storage)
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__}({self._storage})>'
 
 
 def systemd_unescape(text):
