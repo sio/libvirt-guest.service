@@ -226,12 +226,19 @@ class SystemdUnitWrapperMethod:
 class LibvirtActionLog:
     '''In-memory log of past Libvirt actions'''
 
-    def __init__(self, max_length_seconds=60):
-        self._max_length_seconds = max_length_seconds
+    def __init__(self, threshold_sec, max_length_sec=60):
+        self.threshold = threshold_sec
+        self._max_length_sec = max_length_sec
         self._log = ThreadSafeKeyValue()
         self._lock = threading.RLock()
         self._last_update = 0
         self._clear()
+
+    def violated(self, key):
+        '''Check if key violates repetition threshold'''
+        with self._lock:
+            self.new(key)
+            return self.now() - self.prev(key) <= self.threshold
 
     def now(self):
         return time.monotonic()
@@ -262,7 +269,7 @@ class LibvirtActionLog:
     def _cleanup(self):
         '''Remove outdated log entries'''
         with self._lock:
-            if self.now() - self._last_update > self._max_length_seconds:
+            if self.now() - self._last_update > self._max_length_sec:
                 self._clear()
 
     def _update(self, cleanup=True):
@@ -298,7 +305,7 @@ class LibvirtDomainManager:
         self._state = ThreadSafeKeyValue()
         self._lock = threading.RLock()
         self._action_queue = Queue()
-        self._action_log = LibvirtActionLog()
+        self._action_log = LibvirtActionLog(self.CONSECUTIVE_ACTION_THRESHOLD_SEC)
         self.reload_state()
         self.action_thread = threading.Thread(target=self.action_loop, daemon=True)
         self.action_thread.start()
@@ -329,9 +336,7 @@ class LibvirtDomainManager:
         '''
         with ThreadPoolExecutor(max_workers=5) as executor:
             for action, domain_name in iter(self._action_queue.get, None):  # endless loop
-                action_log = self._action_log
-                action_log.new(domain_name)
-                if action_log.now() - action_log.prev(domain_name) <= self.CONSECUTIVE_ACTION_THRESHOLD_SEC:
+                if self._action_log.violated(domain_name):
                     log.debug(f'{self.__class__.__name__}: ignoring action because of repetition threshold: {action} {domain_name}')
                     continue
                 log.debug(f'{self.__class__.__name__}: adding action to queue: {action} {domain_name}')
