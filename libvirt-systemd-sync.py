@@ -466,7 +466,7 @@ class SyncDaemon:
     def stop(self):
         '''Graceful shutdown'''
         # TODO: SyncDaemon shutdown sequence not implemented yet
-        # TODO: Catch SIGTERM and redirect it here
+        # TODO: Catch SIGTERM and redirect it here (or better use custom signal for ExecStop)
         self.systemd.dbus.close()
         self.libvirtd.connection.close()
 
