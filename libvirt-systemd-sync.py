@@ -21,7 +21,7 @@ from queue import Queue
 from pprint import pformat  # debug
 
 
-logging.basicConfig()
+logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s', datefmt='%b %d %H:%M:%S')
 log = logging.getLogger('libvirt-systemd-sync')
 log.level = logging.DEBUG  # debug
 
