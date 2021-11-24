@@ -8,18 +8,13 @@ import json
 import libvirt  # python3-libvirt
 import logging
 import os.path
-import re
 import subprocess
 import threading
 import time
 
 from collections.abc import Mapping, MutableMapping
 from concurrent.futures import ThreadPoolExecutor
-from dbus.mainloop.glib import DBusGMainLoop  # python3-dbus
-from enum import IntEnum
 from queue import Queue
-
-from pprint import pformat  # debug
 
 
 logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s', datefmt='%b %d %H:%M:%S')
