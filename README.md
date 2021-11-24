@@ -24,3 +24,4 @@ Libvirt VM state - this project will be helpful.
 - [Systemd DBus API](https://wiki.freedesktop.org/www/Software/systemd/dbus/)
 - [python3-dbus tutorial](https://dbus.freedesktop.org/doc/dbus-python/tutorial.html),
   [example](https://stackoverflow.com/questions/42088406/starting-a-users-systemd-service-via-python-and-dbus)
+- [Other event listeners for Systemd](https://stackoverflow.com/questions/44946465)
