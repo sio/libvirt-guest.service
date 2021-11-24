@@ -455,6 +455,25 @@ class SyncDaemon:
         self.systemd.set_initial_state(self.libvirtd.state)
         self.initialize_callbacks()
 
+    def stop(self):
+        '''Graceful shutdown'''
+        # TODO: SyncDaemon shutdown sequence not implemented yet
+        # TODO: Catch SIGTERM and redirect it here
+        self.systemd.dbus.close()
+        self.libvirtd.connection.close()
+
+    def healthy(self):
+        '''Check that daemon is healthy'''
+        healthy = True
+        for thread in self.threads:
+            if not thread.is_alive():
+                log.error(f'Thread is not alive: {thread.name}')
+                healthy = False
+        if not self.libvirtd.connection.isAlive():
+            log.error(f'Libvirt connection failed')
+            healthy = False
+        return healthy
+
     def initialize_callbacks(self):
         self.libvirtd.connection.domainEventRegisterAny(
             dom=None,
@@ -533,6 +552,8 @@ def main():
     sync_daemon.start()
 
     while True:  # TODO: check threads health here
+        if not sync_daemon.healthy():
+            sys.exit(1)
         time.sleep(10)
 
 
