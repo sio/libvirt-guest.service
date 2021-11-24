@@ -328,18 +328,14 @@ class LibvirtDomainManager:
         self._action_queue
         '''
         with ThreadPoolExecutor(max_workers=5) as executor:
-            for args in iter(self._action_queue.get, None):  # endless loop
+            for action, domain_name in iter(self._action_queue.get, None):  # endless loop
                 action_log = self._action_log
-                action_log.new(args)
-                if action_log.now() - action_log.prev(args) <= self.CONSECUTIVE_ACTION_THRESHOLD_SEC:
-                    log.debug(f'{self.__class__.__name__}: ignoring action because of repetition threshold: {" ".join(args)}')
+                action_log.new(domain_name)
+                if action_log.now() - action_log.prev(domain_name) <= self.CONSECUTIVE_ACTION_THRESHOLD_SEC:
+                    log.debug(f'{self.__class__.__name__}: ignoring action because of repetition threshold: {action} {domain_name}')
                     continue
-                if  args[0] == 'stop' \
-                and action_log.now() - action_log.prev(('start', args[1])) <= self.CONSECUTIVE_ACTION_THRESHOLD_SEC:
-                    log.debug(f'{self.__class__.__name__}: ignoring rapid start-stop sequence: {args[1]}')
-                    continue
-                log.debug(f'{self.__class__.__name__}: adding action to queue: {" ".join(args)}')
-                executor.submit(self._action, *args)
+                log.debug(f'{self.__class__.__name__}: adding action to queue: {action} {domain_name}')
+                executor.submit(self._action, action, domain_name)
 
     def start(self, domain_name: str):
         '''
@@ -347,6 +343,14 @@ class LibvirtDomainManager:
         (non-blocking, all work is done in background thread)
         '''
         args = ('start', domain_name)
+        self._action_queue.put(args)
+
+    def restart(self, domain_name: str):
+        '''
+        Restart Libvirt domain
+        (non-blocking, all work is done in background thread)
+        '''
+        args = ('restart', domain_name)
         self._action_queue.put(args)
 
     def stop(self, domain_name: str):
@@ -397,9 +401,16 @@ class LibvirtDomainManager:
         target = {
             'start': 'active',
             'stop': 'inactive',
+            'restart': 'special',
         }
         if action not in target:
             raise ValueError(f'invalid action: {action}')
+        if action == 'restart':
+            self._action('stop', domain_name)
+            self._action('start', domain_name)
+            log.info(f'{self.__class__.__name__}: {domain_name} has been restarted')
+            return
+
         execute = getattr(self, f'_{action}')
         start = time.monotonic()
         execute(domain_name)
@@ -460,18 +471,17 @@ def main():
     def libvirt_event_lifecycle(conn, dom, state: int, reason: int, *a, **ka):
         libvirtd._update_state(dom)
         if state == libvirt.VIR_DOMAIN_EVENT_STARTED:
-            libvirtd._action_log.new(('start', dom.name()))
+            libvirtd._action_log.new(dom.name())
             systemd.start(dom.name())
             log.debug(f'Libvirt start event for {dom.name()}, updating systemd unit state')
         elif state == libvirt.VIR_DOMAIN_EVENT_STOPPED:
-            libvirtd._action_log.new(('stop', dom.name()))
+            libvirtd._action_log.new(dom.name())
             systemd.stop(dom.name())
             log.debug(f'Libvirt stop event for {dom.name()}, updating systemd unit state')
 
     def libvirt_event_reboot(conn, dom, opaque, *a, **ka):
         libvirtd._update_state(dom)
-        libvirtd._action_log.new(('start', dom.name()))
-        libvirtd._action_log.new(('stop', dom.name()))
+        libvirtd._action_log.new(dom.name())
         systemd.restart(dom.name())
         log.info(f'Libvirt reboot event for {dom.name()}, triggering systemd unit restart')
 
