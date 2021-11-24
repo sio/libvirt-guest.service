@@ -2,7 +2,6 @@
 Description=Libvirt Guest Domain: %i
 Wants=libvirtd.service
 After=network.target
-Documentation=libvirt-guest-watch --help
 Documentation=https://github.com/sio/libvirt-guest.service
 
 
