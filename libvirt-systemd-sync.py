@@ -245,6 +245,15 @@ class LibvirtActionLog:
                 self._log[key] = [self.now(),]
             self._update()
 
+    def prev(self, key):
+        '''Previous (the one before latest) timestamp for key'''
+        with self._lock:
+            timestamps = self._log.get(key, [])
+            if len(timestamps) < 2:
+                return 0
+            else:
+                return timestamps[-2]
+
     def last(self, key):
         '''Latest timestamp for key'''
         with self._lock:
@@ -317,15 +326,15 @@ class LibvirtDomainManager:
         with ThreadPoolExecutor(max_workers=5) as executor:
             for args in iter(self._action_queue.get, None):  # endless loop
                 action_log = self._action_log
-                if action_log.now() - action_log.last(args) <= self.CONSECUTIVE_ACTION_THRESHOLD_SEC:
+                action_log.new(args)
+                if action_log.now() - action_log.prev(args) <= self.CONSECUTIVE_ACTION_THRESHOLD_SEC:
                     log.debug(f'{self.__class__.__name__}: ignoring action because of repetition threshold: {" ".join(args)}')
                     continue
                 if  args[0] == 'stop' \
-                and action_log.now() - action_log.last(('start', args[1])) <= self.CONSECUTIVE_ACTION_THRESHOLD_SEC:
+                and action_log.now() - action_log.prev(('start', args[1])) <= self.CONSECUTIVE_ACTION_THRESHOLD_SEC:
                     log.debug(f'{self.__class__.__name__}: ignoring rapid start-stop sequence: {args[1]}')
                     continue
                 log.debug(f'{self.__class__.__name__}: adding action to queue: {" ".join(args)}')
-                action_log.new(args)
                 executor.submit(self._action, *args)
 
     def start(self, domain_name: str):
