@@ -486,8 +486,8 @@ def main():
 
     def libvirt_event_reboot(conn, dom, opaque, *a, **ka):
         libvirtd._update_state(dom)
-        libvirtd._action_log.new(dom.name())
-        systemd.restart(dom.name())
+        if not libvirtd._action_log.violated(dom.name()):
+            systemd.restart(dom.name())
         log.info(f'Libvirt reboot event for {dom.name()}, triggering systemd unit restart')
 
     libvirtd.connection.domainEventRegisterAny(
