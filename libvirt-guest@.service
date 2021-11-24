@@ -12,7 +12,7 @@ WantedBy=multi-user.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/true
+ExecStart=/usr/bin/virsh dominfo "%i"
 #Type=notify
 #NotifyAccess=exec
 #ExecStart=virsh start %i
