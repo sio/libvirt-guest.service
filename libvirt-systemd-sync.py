@@ -315,8 +315,12 @@ class LibvirtDomainManager:
             with state._lock: # no state reads either
                 state.clear()
                 for domain in self.connection.listAllDomains():
-                    name = domain.name()
-                    state[name] = 'active' if domain.isActive() else 'inactive'
+                    self._update_state(domain)
+
+    def _update_state(self, domain):
+        '''Store the state of Libvirt domain'''
+        with self._lock:
+            self._state[domain.name()] = 'active' if domain.isActive() else 'inactive'
 
     def action_loop(self):
         '''
@@ -360,7 +364,8 @@ class LibvirtDomainManager:
         '''
         with self._lock:
             domain = self.connection.lookupByName(domain_name)
-            if domain.isActive():
+            self._update_state(domain)
+            if self.state[domain_name] == 'active':
                 return
             log.info(f'{self.__class__.__name__}: sending start command for {domain_name}')
             if domain.create() == 0:
@@ -375,7 +380,8 @@ class LibvirtDomainManager:
         '''
         with self._lock:
             domain = self.connection.lookupByName(domain_name)
-            if not domain.isActive():
+            self._update_state(domain)
+            if self.state[domain_name] == 'inactive':
                 return
             log.info(f'{self.__class__.__name__}: sending shutdown signal for {domain_name}')
             if domain.shutdown() == 0:
@@ -452,19 +458,18 @@ def main():
     )
 
     def libvirt_event_lifecycle(conn, dom, state: int, reason: int, *a, **ka):
+        libvirtd._update_state(dom)
         if state == libvirt.VIR_DOMAIN_EVENT_STARTED:
-            libvirtd._state[dom.name()] = 'active'
             libvirtd._action_log.new(('start', dom.name()))
             systemd.start(dom.name())
             log.debug(f'Libvirt start event for {dom.name()}, updating systemd unit state')
         elif state == libvirt.VIR_DOMAIN_EVENT_STOPPED:
-            libvirtd._state[dom.name()] = 'inactive'
             libvirtd._action_log.new(('stop', dom.name()))
             systemd.stop(dom.name())
             log.debug(f'Libvirt stop event for {dom.name()}, updating systemd unit state')
 
     def libvirt_event_reboot(conn, dom, opaque, *a, **ka):
-        libvirtd._state[dom.name()] = 'active'
+        libvirtd._update_state(dom)
         libvirtd._action_log.new(('start', dom.name()))
         libvirtd._action_log.new(('stop', dom.name()))
         systemd.restart(dom.name())
