@@ -301,7 +301,11 @@ class LibvirtDomainManager:
     CONSECUTIVE_ACTION_THRESHOLD_SEC = 3
 
     def __init__(self):
-        self.event_thread = threading.Thread(target=libvirt_eventloop_start, daemon=True)
+        self.event_thread = threading.Thread(
+            name='libvirt_event_loop',
+            target=libvirt_eventloop_start,
+            daemon=True,
+        )
         self.event_thread.start()  # must be started before opening the connection
         self.connection = libvirt.open()
         self._state = ThreadSafeKeyValue()
@@ -309,7 +313,11 @@ class LibvirtDomainManager:
         self._action_queue = Queue()
         self._action_log = LibvirtActionLog(self.CONSECUTIVE_ACTION_THRESHOLD_SEC)
         self.reload_state()
-        self.action_thread = threading.Thread(target=self.action_loop, daemon=True)
+        self.action_thread = threading.Thread(
+            name='libvirt_action_dispatch',
+            target=self.action_loop,
+            daemon=True,
+        )
 
     @property
     def state(self):
@@ -335,7 +343,7 @@ class LibvirtDomainManager:
         Loop forever executing queued actions as they are added to
         self._action_queue
         '''
-        with ThreadPoolExecutor(max_workers=5) as executor:
+        with ThreadPoolExecutor(max_workers=5, thread_name_prefix='libvirt_action_worker') as executor:
             for action, domain_name in iter(self._action_queue.get, None):  # endless loop
                 if self._action_log.violated(domain_name):
                     log.debug(f'{self.__class__.__name__}: ignoring action because of repetition threshold: {action} {domain_name}')
