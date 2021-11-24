@@ -4,10 +4,12 @@ Translation layer for syncing VM status information from libvirtd to systemd
 '''
 
 import dbus     # python3-dbus
+import json
 import libvirt  # python3-libvirt
 import logging
 import os.path
 import re
+import subprocess
 import threading
 import time
 
@@ -15,7 +17,6 @@ from collections.abc import Mapping, MutableMapping
 from concurrent.futures import ThreadPoolExecutor
 from dbus.mainloop.glib import DBusGMainLoop  # python3-dbus
 from enum import IntEnum
-from gi.repository import GLib  # python3-gi
 from queue import Queue
 
 from pprint import pformat  # debug
@@ -114,8 +115,6 @@ class SystemdUnitManager:
 
     def __init__(self, template_prefix: str):
         self.template_prefix = template_prefix
-        DBusGMainLoop(set_as_default=True)
-        self.event_loop = GLib.MainLoop()
         self.dbus = dbus.SystemBus()
         self.daemon = self.dbus_object('/org/freedesktop/systemd1')
         self.manager = dbus.Interface(self.daemon, 'org.freedesktop.systemd1.Manager')
@@ -128,17 +127,20 @@ class SystemdUnitManager:
         '''Start systemd unit that corresponds to Libvirt domain'''
         unit = self.unit(self._unit_name(domain_name))
         if unit['ActiveState'] != 'active':
+            log.info(f'{self.__class__.__name__}: sending start command for {domain_name}')
             unit.Start('fail')
 
     def restart(self, domain_name: str):
         '''Restart systemd unit that corresponds to Libvirt domain'''
         unit = self.unit(self._unit_name(domain_name))
+        log.info(f'{self.__class__.__name__}: sending restart command for {domain_name}')
         unit.Restart('fail')
 
     def stop(self, domain_name: str):
         '''Stop systemd unit that corresponds to Libvirt domain'''
         unit = self.unit(self._unit_name(domain_name))
         if unit['ActiveState'] != 'inactive':
+            log.info(f'{self.__class__.__name__}: sending stop command for {domain_name}')
             unit.Stop('fail')
 
     def dbus_object(self, path: str):
@@ -300,7 +302,7 @@ class LibvirtDomainManager:
 
     def __init__(self):
         self.event_thread = threading.Thread(target=libvirt_eventloop_start, daemon=True)
-        self.event_thread.start()
+        self.event_thread.start()  # must be started before opening the connection
         self.connection = libvirt.open()
         self._state = ThreadSafeKeyValue()
         self._lock = threading.RLock()
@@ -308,7 +310,6 @@ class LibvirtDomainManager:
         self._action_log = LibvirtActionLog(self.CONSECUTIVE_ACTION_THRESHOLD_SEC)
         self.reload_state()
         self.action_thread = threading.Thread(target=self.action_loop, daemon=True)
-        self.action_thread.start()
 
     @property
     def state(self):
@@ -428,84 +429,111 @@ class LibvirtDomainManager:
         log.info(f'{self.__class__.__name__}: {domain_name} has reached target state: {target[action]}')
 
 
+class SyncDaemon:
+    '''Main daemon object'''
 
+    CONSECUTIVE_ACTION_THRESHOLD_SEC = 3
 
-def main():
-    template_prefix = 'libvirt-guest'
-    libvirtd = LibvirtDomainManager()
-    systemd = SystemdUnitManager(template_prefix)
-    systemd.set_initial_state(libvirtd.state)
+    def __init__(self, template_prefix):
+        self.libvirtd = LibvirtDomainManager()
+        self.systemd = SystemdUnitManager(template_prefix)
+        self._journalctl_event_log = LibvirtActionLog(self.CONSECUTIVE_ACTION_THRESHOLD_SEC)
+        self.threads = [
+            threading.Thread(
+                name='journalctl_event_listener',
+                target=self.journalctl_loop,
+                daemon=True,
+            ),
+            self.libvirtd.event_thread,
+            self.libvirtd.action_thread,
+        ]
 
-    def dbus_signal_handler(interface_name, changed_properties, invalidated_properties, path, **kwargs):
-        if interface_name != 'org.freedesktop.systemd1.Unit':
+    def start(self):
+        for thread in self.threads:
+            if not thread.is_alive():
+                thread.start()
+        self.systemd.set_initial_state(self.libvirtd.state)
+        self.initialize_callbacks()
+
+    def initialize_callbacks(self):
+        self.libvirtd.connection.domainEventRegisterAny(
+            dom=None,
+            eventID=libvirt.VIR_DOMAIN_EVENT_ID_LIFECYCLE,
+            cb=self.libvirt_event_lifecycle,
+            opaque=2,
+        )
+        self.libvirtd.connection.domainEventRegisterAny(
+            dom=None,
+            eventID=libvirt.VIR_DOMAIN_EVENT_ID_REBOOT,
+            cb=self.libvirt_event_reboot,
+            opaque=None,
+        )
+
+    def journalctl_loop(self):
+        '''
+        Listen to Journal changes to detect unit start/stop/restart events
+
+        DBus signal (PropertiesChanged) is unreliable because it's sent
+        multiple times for a single change,
+        e.g. a single `systemctl start libvirt-guest@domain.service` will fire
+        many PropertiesChanged signals (first with ActiveState=inactive, then
+        ActiveState=activating, then several with ActiveState=active).
+        It's therefore impossible to detect which inactive-active sequences indicate
+        that service was restarted and which are just noise.
+        '''
+        systemd = self.systemd
+        cmd = 'journalctl --lines=0 --follow --output=json -u'.split()
+        cmd.append(f'{systemd.template_prefix}@*')
+        journal = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        for line in journal.stdout:  # endless loop
+            event = json.loads(line.decode())
+            unit_name = event.get('UNIT')
+            action = event.get('JOB_TYPE')
+            result = event.get('JOB_RESULT')
+            if action not in {'start', 'stop', 'restart'}:
+                continue
+            if action == 'start' and result is not None:
+                continue
+            if action in {'stop', 'restart'} and result != 'done':
+                continue
+            if self._journalctl_event_log.violated(unit_name):
+                log.debug(f'Journalctl: ignoring event because of repetition threshold: {action} {unit_name}')
+                continue
+            self.journalctl_event_handler(action, unit_name)
+
+    def journalctl_event_handler(self, action: str, unit_name: str):
+        prefix, domain, _ = systemd_parse_unit_name(unit_name)
+        if prefix != self.systemd.template_prefix:
             return
-        if 'ActiveState' not in changed_properties:
-            return
-        prefix, domain, _ = systemd_parse_unit_name(systemd_unescape(os.path.basename(path)))
-        if prefix != template_prefix:
-            return
-        systemd_state = changed_properties['ActiveState']
-        state = {
-            'activating': 'active',
-            'active': 'active',
-            'inactive': 'inactive',
-        }
-        if systemd_state not in state:
-            log.error(f'dbus_signal_handler received unknown unit state: {systemd_state}')
-            return
-        if state[systemd_state] == libvirtd.state.get(domain):
-            return
-        log.debug(f'Systemd event: {systemd_state} {domain}')
-        if state[systemd_state] == 'active':
-            libvirtd.start(domain)
-        elif state[systemd_state] == 'inactive':
-            libvirtd.stop(domain)
-        else:
-            raise RuntimeError(f'impossible branching with state: {state[systemd_state]} ({systemd_state})')
+        log.debug(f'Systemd event: {action} {domain}')
+        getattr(self.libvirtd, action)(domain)
 
-
-    systemd.dbus.add_signal_receiver(
-        handler_function=dbus_signal_handler,
-        signal_name='PropertiesChanged',
-        dbus_interface='org.freedesktop.DBus.Properties',
-        bus_name=None,
-        path=None,
-        path_keyword='path',
-    )
-
-    def libvirt_event_lifecycle(conn, dom, state: int, reason: int, *a, **ka):
+    def libvirt_event_lifecycle(self, conn, dom, state: int, reason: int, *a, **ka):
+        libvirtd, systemd = self.libvirtd, self.systemd
         libvirtd._update_state(dom)
         if state == libvirt.VIR_DOMAIN_EVENT_STARTED:
             libvirtd._action_log.new(dom.name())
             systemd.start(dom.name())
-            log.debug(f'Libvirt start event for {dom.name()}, updating systemd unit state')
+            log.debug(f'Libvirt event: start {dom.name()}, updating systemd unit state')
         elif state == libvirt.VIR_DOMAIN_EVENT_STOPPED:
             libvirtd._action_log.new(dom.name())
             systemd.stop(dom.name())
-            log.debug(f'Libvirt stop event for {dom.name()}, updating systemd unit state')
+            log.debug(f'Libvirt event: stop {dom.name()}, updating systemd unit state')
 
-    def libvirt_event_reboot(conn, dom, opaque, *a, **ka):
+    def libvirt_event_reboot(self, conn, dom, opaque, *a, **ka):
+        libvirtd, systemd = self.libvirtd, self.systemd
         libvirtd._update_state(dom)
         if not libvirtd._action_log.violated(dom.name()):
             systemd.restart(dom.name())
-        log.info(f'Libvirt reboot event for {dom.name()}, triggering systemd unit restart')
-
-    libvirtd.connection.domainEventRegisterAny(
-        dom=None,
-        eventID=libvirt.VIR_DOMAIN_EVENT_ID_LIFECYCLE,
-        cb=libvirt_event_lifecycle,
-        opaque=2,
-    )
-    libvirtd.connection.domainEventRegisterAny(
-        dom=None,
-        eventID=libvirt.VIR_DOMAIN_EVENT_ID_REBOOT,
-        cb=libvirt_event_reboot,
-        opaque=None,
-    )
-
-    systemd.event_loop.run()
+        log.debug(f'Libvirt event: reboot {dom.name()}, triggering systemd unit restart')
 
 
+def main():
+    sync_daemon = SyncDaemon(template_prefix='libvirt-guest')
+    sync_daemon.start()
+
+    while True:  # TODO: check threads health here
+        time.sleep(10)
 
 
 if __name__ == '__main__':
