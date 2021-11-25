@@ -1,0 +1,24 @@
+- name: create project directory
+  file:
+    path: /src/
+    state: directory
+
+- name: copy project files
+  loop:
+    - Makefile
+    - libvirt-guest-manager
+    - libvirt-guest-manager.service
+    - libvirt-guest@.service
+  vars:
+    project_dir: '{{ molecule_scenario_directory }}/../../../'
+  copy:
+    src: '{{ project_dir }}/{{ item }}'
+    dest: '/src/{{ item }}'
+    mode: '0600'
+  register: install
+
+- name: install libvirt-guest@.service
+  command:
+    cmd: make install
+    chdir: /src/
+  when: install is changed

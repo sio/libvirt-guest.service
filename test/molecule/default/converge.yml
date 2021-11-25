@@ -6,6 +6,7 @@
         libvirt_guest_service:
           - python3-dbus
           - python3-libvirt
+          - make  # only for installer
         libvirtd:
           - qemu-system-x86
           - qemu-utils  # qemu-img
@@ -17,3 +18,4 @@
         name: '{{ libvirtd + libvirt_guest_service}}'
 
     - import_tasks: tasks/create_vms.yml
+    - import_tasks: tasks/install_service.yml
