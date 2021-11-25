@@ -1,0 +1,48 @@
+<domain type='kvm'>
+  <name>{{ item }}</name>
+  <uuid>{{ item|to_uuid }}</uuid>
+  <memory unit='MiB'>256</memory>
+  <vcpu placement='static'>1</vcpu>
+  <os>
+    <type machine='q35'>hvm</type>
+    <boot dev='hd'/>
+  </os>
+  <features>
+    <acpi/>
+    <apic/>
+    <pae/>
+  </features>
+  <cpu>
+    <topology sockets='1' dies='1' cores='1' threads='1'/>
+  </cpu>
+  <clock offset='utc'/>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>destroy</on_crash>
+  <devices>
+    <emulator>/usr/bin/qemu-system-x86_64</emulator>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2' discard='unmap'/>
+      <source file='/vm/{{ item }}.qcow2'/>
+      <target dev='vda' bus='virtio'/>
+    </disk>
+    <input type='mouse' bus='ps2'/>
+    <input type='keyboard' bus='ps2'/>
+    <graphics type='spice' autoport='yes'>
+      <listen type='address'/>
+      <image compression='off'/>
+      <clipboard copypaste='no'/>
+      <filetransfer enable='no'/>
+    </graphics>
+    <rng model='virtio'>
+      <rate period='2000' bytes='1234'/>
+      <backend model='random'>/dev/random</backend>
+    </rng>
+    <serial type='pty'>
+      <target port='0'/>
+    </serial>
+    <console type='pty'>
+      <target type='serial' port='0'/>
+    </console>
+  </devices>
+</domain>

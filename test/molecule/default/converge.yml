@@ -38,6 +38,14 @@
       args:
         creates: '/vm/{{ item }}.qcow2'
 
-    - name: create virtual machine
-      debug:
-        msg: '{{ lookup("template", libvirt.xml) }}'
+    - name: check list of virtual machine definitions
+      virt:
+        command: list_vms
+      register: libvirt
+
+    - name: define virtual machine
+      loop: '{{ guests }}'
+      virt:
+        command: define
+        xml: '{{ lookup("template", "libvirt.xml") }}'
+      when: item not in libvirt.list_vms
