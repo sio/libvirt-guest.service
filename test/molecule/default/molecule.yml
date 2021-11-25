@@ -25,6 +25,16 @@ provisioner:
           - guest-bar
           - guest-baz
 
+scenario:
+  test_sequence:
+    - cleanup
+    - destroy
+    - create
+    - converge
+    - verify
+    - cleanup
+    - destroy
+
 
 verifier:
   name: ansible
