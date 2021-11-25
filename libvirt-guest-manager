@@ -507,6 +507,7 @@ class SyncDaemon:
         systemd = self.systemd
         cmd = 'journalctl --lines=0 --follow --output=json -u'.split()
         cmd.append(f'{systemd.template_prefix}@*')
+        log.debug(f'Starting subprocess: {cmd}')
         journal = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         for line in journal.stdout:  # endless loop
             event = json.loads(line.decode())
