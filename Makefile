@@ -31,3 +31,8 @@ install: check-requirements
 	chmod 644 $(SYSTEMD)/libvirt-guest-manager.service
 
 	systemctl daemon-reload
+
+
+.PHONY: test
+test:
+	$(MAKE) -C test
