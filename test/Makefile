@@ -48,3 +48,6 @@ Makefile.venv:
 	echo "5afbcf51a82f629cd65ff23185acde90ebe4dec889ef80bbdc12562fbd0b2611 *Makefile.fetched" \
 		| sha256sum --check - \
 		&& mv Makefile.fetched Makefile.venv
+
+
+export PATH:=$(VENV):$(PATH)
