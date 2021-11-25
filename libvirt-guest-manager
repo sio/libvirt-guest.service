@@ -493,6 +493,11 @@ class SyncDaemon:
         )
 
     def journalctl_loop(self):
+        while True:
+            self._journalctl_listen()
+            time.sleep(1)
+
+    def _journalctl_listen(self):
         '''
         Listen to Journal changes to detect unit start/stop/restart events
 
@@ -524,6 +529,8 @@ class SyncDaemon:
                 log.debug(f'Journalctl: ignoring event because of repetition threshold: {action} {unit_name}')
                 continue
             self.journalctl_event_handler(action, unit_name)
+        journal.poll()
+        log.debug(f'Journalctl subprocess died unexpectedly (exit code {journal.returncode}), restarting')
 
     def journalctl_event_handler(self, action: str, unit_name: str):
         prefix, domain, _ = systemd_parse_unit_name(unit_name)
