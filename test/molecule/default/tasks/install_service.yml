@@ -22,3 +22,10 @@
     cmd: make install
     chdir: /src/
   when: install is changed
+  register: make_install
+
+- name: show installation errors
+  debug:
+    msg: '{{ make_install.stderr }}'
+  when: make_install is not skipped
+  failed_when: make_install.stderr|length != 0
