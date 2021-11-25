@@ -36,3 +36,8 @@ install: check-requirements
 .PHONY: test
 test:
 	$(MAKE) -C test
+
+
+.PHONY: clean
+clean:
+	git clean -idx
