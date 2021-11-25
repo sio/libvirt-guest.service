@@ -11,6 +11,7 @@
           - qemu-utils  # qemu-img
           - libvirt-clients
           - libvirt-daemon-system
+          - python3-lxml  # virt_net
       package:
         state: present
         name: '{{ libvirtd + libvirt_guest_service}}'
@@ -49,6 +50,11 @@
       virt:
         command: list_vms
       register: libvirt
+
+    - name: enable default libvirt network
+      virt_net:
+        name: default
+        state: active
 
     - name: define virtual machine
       loop: '{{ guests }}'

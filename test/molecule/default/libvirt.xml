@@ -28,6 +28,9 @@
     </disk>
     <input type='mouse' bus='ps2'/>
     <input type='keyboard' bus='ps2'/>
+    <interface type='network'>
+      <source network='default'/>
+    </interface>
     <graphics type='spice' autoport='yes'>
       <listen type='address'/>
       <image compression='off'/>
