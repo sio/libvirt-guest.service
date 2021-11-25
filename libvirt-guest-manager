@@ -18,7 +18,7 @@ from queue import Queue
 
 
 logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s', datefmt='%b %d %H:%M:%S')
-log = logging.getLogger('libvirt-systemd-sync')
+log = logging.getLogger(os.path.basename(__file__))
 log.level = logging.DEBUG  # debug
 
 
