@@ -1,5 +1,5 @@
-ansible
+ansible==4.9.0
 
-molecule
-molecule-vagrant
-python-vagrant
+molecule==3.5.2
+molecule-vagrant==0.6.3
+python-vagrant==0.5.15
