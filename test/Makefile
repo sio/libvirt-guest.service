@@ -37,6 +37,11 @@ molecule-version: | venv
 .PHONY: host-requirements
 host-requirements: kvm-requirements
 	@$(PY) -c 'import venv; import ensurepip'  # check for python3-venv package
+	@vagrant --version >/dev/null
+	@vagrant plugin list | grep -q libvirt || { \
+		echo 'Vagrant plugin for Libvirt not installed'; \
+		false; \
+	}
 
 
 .PHONY: kvm-requirements
