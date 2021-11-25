@@ -1,5 +1,10 @@
 .DEFAULT_GOAL=test
-PY=/usr/bin/python3
+PY?=/usr/bin/python3
+
+
+export PY_COLORS=1
+export ANSIBLE_FORCE_COLOR=1
+export ANSIBLE_STDOUT_CALLBACK=yaml
 
 
 MOLECULE_ACTIONS=\
