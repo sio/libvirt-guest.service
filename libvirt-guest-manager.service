@@ -11,6 +11,7 @@ WantedBy=multi-user.target
 
 
 [Service]
-Type=simple  # TODO: change type to notify
+# TODO: change unit type to notify
+Type=simple
 ExecStart=/usr/local/bin/libvirt-guest-manager
 # TODO: add ExecStop= or KillSignal= (man systemd.kill)
