@@ -9,6 +9,7 @@ import libvirt  # python3-libvirt
 import logging
 import os.path
 import subprocess
+import sys
 import threading
 import time
 
