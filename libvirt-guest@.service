@@ -1,7 +1,8 @@
 [Unit]
 Description=Libvirt Guest Domain: %i
 Wants=libvirtd.service
-After=network.target
+Requires=libvirt-guest-manager.service
+After=network.target libvirt-guest-manager.service
 Documentation=https://github.com/sio/libvirt-guest.service
 
 

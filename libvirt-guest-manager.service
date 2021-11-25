@@ -1,0 +1,16 @@
+[Unit]
+Description=Libvirt Guest Manager
+Wants=libvirtd.service
+Conflicts=libvirt-guests.service
+After=network.target libvirt-guests.service
+Documentation=https://github.com/sio/libvirt-guest.service
+
+
+[Install]
+WantedBy=multi-user.target
+
+
+[Service]
+Type=simple  # TODO: change type to notify
+ExecStart=/usr/local/bin/libvirt-guest-manager
+# TODO: add ExecStop= or KillSignal= (man systemd.kill)
