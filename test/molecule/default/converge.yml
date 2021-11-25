@@ -1,0 +1,4 @@
+- hosts: all
+  gather_facts: no
+  become: no
+  tasks: []  # we're not actually testing Ansible code here

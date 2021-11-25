@@ -1,0 +1,30 @@
+driver:
+  name: vagrant
+  provider:
+    name: libvirt
+
+
+platforms:
+  - name: debian10-test-host
+    box: potyarkin/debian10
+    memory: 2048
+  - name: debian11-test-host
+    box: potyarkin/debian11
+    memory: 2048
+
+
+provisioner:
+  name: ansible
+  log: yes
+  inventory:
+    group_vars:
+      all:
+        ansible_python_interpreter: /usr/bin/python3
+        guests:
+          - guest-foo
+          - guest-bar
+          - guest-baz
+
+
+verifier:
+  name: ansible
