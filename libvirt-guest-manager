@@ -437,6 +437,7 @@ class SyncDaemon:
     '''Main daemon object'''
 
     CONSECUTIVE_ACTION_THRESHOLD_SEC = 3
+    JOURNALCTL_RESTART_DELAY_SEC = 1
 
     def __init__(self, template_prefix):
         self.libvirtd = LibvirtDomainManager()
@@ -495,7 +496,7 @@ class SyncDaemon:
     def journalctl_loop(self):
         while True:
             self._journalctl_listen()
-            time.sleep(1)
+            time.sleep(self.JOURNALCTL_RESTART_DELAY_SEC)
 
     def _journalctl_listen(self):
         '''
@@ -511,7 +512,7 @@ class SyncDaemon:
         '''
         systemd = self.systemd
         cmd = 'journalctl --lines=0 --follow --output=json'.split()
-        cmd.extend(['--since=1 second ago'])
+        cmd.extend(['--since={} second ago'.format(self.JOURNALCTL_RESTART_DELAY_SEC)])
         cmd.extend(['-u', f'{systemd.template_prefix}@*'])
         log.debug(f'Starting subprocess: {cmd}')
         journal = subprocess.Popen(cmd, stdout=subprocess.PIPE)
