@@ -22,8 +22,15 @@
 
     - name: download virtual machine base image
       get_url:
-        url: https://dl-cdn.alpinelinux.org/alpine/v3.15/releases/x86/alpine-virt-3.15.0-x86.iso
-        checksum: sha256:ad0c6f95754c29b31c6afd29a9acefa121a127c80f225a90a9495e6b5bc74b48
+        # Cirros is a Linux distro made specifically for test purposes
+        # Features:
+        #   - small image size
+        #   - insecure default login with known password
+        #   - console=ttyS0 in kernel cmdline (used by virsh login)
+        #   - acpid is started automatically on boot (unlike Alpine Live ISO
+        #     which can not handle power button events until acpid is started manually)
+        url: https://download.cirros-cloud.net/0.5.2/cirros-0.5.2-x86_64-disk.img
+        checksum: md5:https://download.cirros-cloud.net/0.5.2/MD5SUMS
         dest: /vm/base.qcow2
         owner: libvirt-qemu
         mode: '0600'
