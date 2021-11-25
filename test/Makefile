@@ -1,4 +1,26 @@
+.DEFAULT_GOAL=test
 PY=/usr/bin/python3
+
+
+MOLECULE_ACTIONS=\
+	cleanup \
+	converge \
+	create \
+	dependency \
+	destroy \
+	idempotence \
+	lint \
+	login \
+	prepare \
+	side_effect \
+	syntax \
+	test \
+	verify
+
+
+.PHONY: $(MOLECULE_ACTIONS)
+$(MOLECULE_ACTIONS): host-requirements | venv
+	$(VENV)/molecule $@ $(MOLECULE_ARGS)
 
 
 .PHONY: host-requirements
@@ -16,3 +38,13 @@ kvm-requirements:
 		echo "Nested virtualization not supported, see $(KVM_NESTED_HELP)"; \
 		false; \
 	}
+
+
+include Makefile.venv
+Makefile.venv:
+	curl \
+		-o Makefile.fetched \
+		-L "https://github.com/sio/Makefile.venv/raw/v2020.08.14/Makefile.venv"
+	echo "5afbcf51a82f629cd65ff23185acde90ebe4dec889ef80bbdc12562fbd0b2611 *Makefile.fetched" \
+		| sha256sum --check - \
+		&& mv Makefile.fetched Makefile.venv
