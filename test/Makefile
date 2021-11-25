@@ -19,8 +19,14 @@ MOLECULE_ACTIONS=\
 
 
 .PHONY: $(MOLECULE_ACTIONS)
-$(MOLECULE_ACTIONS): host-requirements | venv
+$(MOLECULE_ACTIONS): host-requirements molecule-version | venv
 	$(VENV)/molecule $@ $(MOLECULE_ARGS)
+
+
+.PHONY: molecule-version
+molecule-version: | venv
+	$(VENV)/molecule --version
+	$(VENV)/ansible --version
 
 
 .PHONY: host-requirements
