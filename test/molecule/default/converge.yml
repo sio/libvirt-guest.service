@@ -33,6 +33,33 @@
       retries: 10
       delay: 2
 
+    - name: download alpine overlay image
+      get_url:
+        # Alpine is blazing fast to boot and provides small boot images.
+        #
+        # It also has most of Cirros advantages (console=ttyS0 by default,
+        # passwordless login for root). The only thing it's lacking is acpid
+        # autostart (to handle power button events sent by libvirt).
+        #
+        # This overlay image was created by Vitaly Potyarkin on Alpine 3.15.
+        # The only change it introduces is
+        # `ln -s /etc/init.d/acpid /etc/runlevels/default/acpid`
+        # to enable acpid autostart.
+        #
+        # More info: https://wiki.alpinelinux.org/wiki/Running_Alpine_in_Live_mode_in_QEMU
+        #
+        # This may break in the future with Alpine versions other than 3.15,
+        # but it's unlikely we'll need to upgrade OS on guests
+        url: https://f003.backblazeb2.com/file/public-b1009b/blobs/alpine_v3.15-overlay-autostart-acpid.qcow2
+        checksum: sha256:4f58e66fe303c9c1a8a2a29efa65ea014097c3a27bb0e01049018210d85bb719
+        dest: /vm/overlay.qcow2
+        owner: libvirt-qemu
+        mode: '0600'
+      register: get_url
+      until: get_url is not failed
+      retries: 10
+      delay: 2
+
     - name: derive guest images from the base one
       loop: '{{ guests }}'
       command: 'qemu-img create -f qcow2 -b /vm/base.qcow2 /vm/{{ item }}.qcow2'
