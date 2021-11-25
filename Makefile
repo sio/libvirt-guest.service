@@ -3,9 +3,6 @@ SYSTEMD?=/etc/systemd/system
 PY?=/usr/bin/env python3
 
 
-VIRSH=$(shell command -v virsh)
-
-
 .PHONY: check-requirements
 check-requirements:
 	@$(PY) -c 'import libvirt'
@@ -23,7 +20,7 @@ install: check-requirements
 	chown root:root $(BIN)/libvirt-guest-manager
 	chmod 755 $(BIN)/libvirt-guest-manager
 
-	sed 's|/usr/bin/virsh|$(VIRSH)|g' \
+	sed "s|/usr/bin/virsh|$$(command -v virsh)|g" \
 		libvirt-guest@.service > $(SYSTEMD)/libvirt-guest@.service
 	chown root:root $(SYSTEMD)/libvirt-guest@.service
 	chmod 644 $(SYSTEMD)/libvirt-guest@.service
