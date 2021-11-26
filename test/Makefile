@@ -39,6 +39,14 @@ quicktest: converge verify
 quicktest-cleanup: destroy
 
 
+.PHONY: login-debian10
+login-debian10: MOLECULE_ARGS+=--host debian10-test-host
+login-debian10: login
+.PHONY: login-debian11
+login-debian11: MOLECULE_ARGS+=--host debian11-test-host
+login-debian11: login
+
+
 .PHONY: molecule-version
 molecule-version: | venv
 	$(VENV)/molecule --version
