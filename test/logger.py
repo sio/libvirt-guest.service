@@ -80,6 +80,8 @@ class LibvirtSystemdLogger:
 
     def listen_fifo(self):
         '''Listen for STOP message on control FIFO'''
+        if os.path.exists(self.control_fifo):
+            os.unlink(self.control_fifo)
         os.mkfifo(self.control_fifo)
         with open(self.control_fifo) as fifo:
             for line in fifo:
