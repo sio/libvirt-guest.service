@@ -28,6 +28,17 @@ $(MOLECULE_ACTIONS): host-requirements molecule-version | venv
 	$(VENV)/molecule $@ $(MOLECULE_ARGS)
 
 
+# Quicktest is a shortened test sequence that leaves the host in a "dirty"
+# state. Vagrant VMs created for tests will not be destroyed and may be reused
+# in subsequent quicktest runs. This is very helpful for rapid development with
+# short iterations, but reusing VMs accumulates cruft and  may introduce some
+# inconsistencies, so you should run full 'make test' from time to time anyways.
+.PHONY: quicktest
+quicktest: converge verify
+.PHONY: quicktest-cleanup
+quicktest-cleanup: destroy
+
+
 .PHONY: molecule-version
 molecule-version: | venv
 	$(VENV)/molecule --version
