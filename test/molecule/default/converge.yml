@@ -19,3 +19,4 @@
 
     - import_tasks: tasks/create_vms.yml
     - import_tasks: tasks/install_service.yml
+    - import_tasks: tasks/install_logger.yml

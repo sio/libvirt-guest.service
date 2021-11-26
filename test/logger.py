@@ -122,7 +122,7 @@ class LibvirtSystemdLogger:
     def systemd_start_stop(self):
         '''Listen to systemd unit start/stop events (no restarts here)'''
         markers = {
-            'start': 'systemd[1]: Started Libvirt Guest Domain: ',
+            'start': 'systemd[1]: Starting Libvirt Guest Domain: ',
             'stop': 'systemd[1]: Stopped Libvirt Guest Domain: ',
         }
         for line in tail('/var/log/daemon.log'):
