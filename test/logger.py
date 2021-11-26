@@ -40,9 +40,22 @@ class LibvirtSystemdLogger:
                 daemon=True,
             ))
 
+    def run(self):
+        self.start()
+        while self.healthy():
+            time.sleep(1)
+        raise RuntimeError(f'One of {self.__class__.__name__} subprocesses exited early')
+
     def start(self):
         for thread in self.threads:
-            thread.start()
+            if not thread.is_alive():
+                thread.start()
+
+    def healthy(self):
+        for thread in self.threads:
+            if not thread.is_alive():
+                return False
+        return True
 
     def record(self, subsystem: str, action: str, domain: str):
         with self.lock:
@@ -138,9 +151,7 @@ def parse_args(*a, **ka):
 def main():
     args = parse_args()
     logger = LibvirtSystemdLogger(args.template_prefix, args.domains)
-    logger.start()
-    while True:
-        time.sleep(1)
+    logger.run()
 
 
 if __name__ == '__main__':
