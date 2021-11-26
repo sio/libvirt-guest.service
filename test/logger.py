@@ -23,6 +23,11 @@ class LibvirtSystemdLogger:
         self.lock = threading.RLock()
         self.threads = []
         self.threads.append(threading.Thread(
+            target=self.systemd_start_stop,
+            name='systemd_start_stop',
+            daemon=True,
+        ))
+        self.threads.append(threading.Thread(
             target=self.libvirt_reboot,
             name='libvirt_reboot',
             daemon=True,
@@ -81,6 +86,19 @@ class LibvirtSystemdLogger:
             prev_event = self.timestamp()
             domain = line.split("'")[3]
             self.record('libvirt', 'restart', domain)
+
+    def systemd_start_stop(self):
+        '''Listen to systemd unit start/stop events (no restarts here)'''
+        markers = {
+            'start': 'systemd[1]: Started Libvirt Guest Domain: ',
+            'stop': 'systemd[1]: Stopped Libvirt Guest Domain: ',
+        }
+        for line in tail('/var/log/daemon.log'):
+            for action, marker in markers.items():
+                if marker.lower() in line.lower():
+                    marker_start = line.lower().find(marker.lower())
+                    domain = line[marker_start+len(marker):].strip().rstrip('.')
+                    self.record('systemd', action, domain)
 
 
 def tail(filepath: str):
