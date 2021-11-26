@@ -1,0 +1,5 @@
+- name: copy logger.py
+  copy:
+    src: '{{ molecule_scenario_directory }}/../../logger.py'
+    dest: /usr/local/bin/test_logger
+    mode: '0755'
