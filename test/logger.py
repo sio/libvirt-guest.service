@@ -15,11 +15,18 @@ import time
 
 class LibvirtSystemdLogger:
 
+    MIN_REPEAT_DELAY_SEC = 2
+
     def __init__(self, template_prefix: str, domains: list):
         self.template_prefix = template_prefix
         self.domains = domains
         self.lock = threading.RLock()
         self.threads = []
+        self.threads.append(threading.Thread(
+            target=self.libvirt_reboot,
+            name='libvirt_reboot',
+            daemon=True,
+        ))
         for domain in self.domains:
             self.threads.append(threading.Thread(
                 target=self.libvirt_start_stop,
@@ -55,6 +62,25 @@ class LibvirtSystemdLogger:
                 if marker in line.lower():
                     self.record('libvirt', action, domain)
                     continue
+
+    def libvirt_reboot(self):
+        '''
+        Listen to libvirt reboot events
+
+        Virsh buffers stdout when it detects that it is connected to pipe,
+        so we need 'stdbuf' to regain realtime output.
+        Thanks to:
+            https://stackoverflow.com/a/52851238
+            https://unix.stackexchange.com/questions/25372
+        '''
+        command = 'stdbuf -o0 virsh event --event reboot --loop'.split()
+        prev_event = 0
+        for line in stdout(command):
+            if self.timestamp() - prev_event <= self.MIN_REPEAT_DELAY_SEC:
+                continue
+            prev_event = self.timestamp()
+            domain = line.split("'")[3]
+            self.record('libvirt', 'restart', domain)
 
 
 def tail(filepath: str):
