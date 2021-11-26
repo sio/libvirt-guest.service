@@ -68,12 +68,12 @@ class LibvirtSystemdLogger:
 
     def record(self, subsystem: str, action: str, domain: str):
         with self.lock:
-            print(dict(
+            print(yaml(dict(
                 timestamp=self.timestamp(),
                 subsystem=subsystem,
                 action=action,
                 domain=domain,
-            ))
+            )))
 
     def timestamp(self):
         return time.monotonic()
@@ -145,6 +145,15 @@ def stdout(command: list):
     process = subprocess.Popen(command, stdout=subprocess.PIPE)
     for line in process.stdout:
         yield line.decode()
+
+
+def yaml(dictionary):
+    '''Primitive YAML generator for single-line keys and values'''
+    output = []
+    for key in sorted(dictionary):
+        prefix = '  ' if output else '- '
+        output.append(f'{prefix}{key}: {repr(dictionary[key])}')
+    return '\n'.join(output)
 
 
 def parse_args(*a, **ka):
