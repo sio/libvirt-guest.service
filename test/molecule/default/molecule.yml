@@ -7,9 +7,13 @@ driver:
 platforms:
   - name: debian10-test-host
     box: potyarkin/debian10
+    cpu_mode: host-passthrough
+    cpus: 2
     memory: 2048
   - name: debian11-test-host
     box: potyarkin/debian11
+    cpu_mode: host-passthrough
+    cpus: 2
     memory: 2048
 
 
