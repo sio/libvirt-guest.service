@@ -8,6 +8,7 @@ source as in libvirt-guest-manager
 
 
 import argparse
+import os
 import subprocess
 import threading
 import time
@@ -17,11 +18,17 @@ class LibvirtSystemdLogger:
 
     MIN_REPEAT_DELAY_SEC = 2
 
-    def __init__(self, template_prefix: str, domains: list):
+    def __init__(self, template_prefix: str, domains: list, control_fifo: str):
         self.template_prefix = template_prefix
         self.domains = domains
+        self.control_fifo = control_fifo
         self.lock = threading.RLock()
         self.threads = []
+        self.threads.append(threading.Thread(
+            target=self.listen_fifo,
+            name='listen_fifo',
+            daemon=True,
+        ))
         self.threads.append(threading.Thread(
             target=self.systemd_start_stop,
             name='systemd_start_stop',
@@ -42,11 +49,13 @@ class LibvirtSystemdLogger:
 
     def run(self):
         self.start()
-        while self.healthy():
+        while not self.stop:
+            if not self.healthy():
+                raise RuntimeError(f'One of {self.__class__.__name__} subprocesses exited early')
             time.sleep(1)
-        raise RuntimeError(f'One of {self.__class__.__name__} subprocesses exited early')
 
     def start(self):
+        self.stop = False
         for thread in self.threads:
             if not thread.is_alive():
                 thread.start()
@@ -68,6 +77,16 @@ class LibvirtSystemdLogger:
 
     def timestamp(self):
         return time.monotonic()
+
+    def listen_fifo(self):
+        '''Listen for STOP message on control FIFO'''
+        os.mkfifo(self.control_fifo)
+        with open(self.control_fifo) as fifo:
+            for line in fifo:
+                if line.strip() == 'STOP':
+                    self.stop = True
+                    break
+        os.unlink(self.control_fifo)
 
     def libvirt_start_stop(self, domain):
         '''Listen to libvirt domain start/stop events (no reboot events here)'''
@@ -134,6 +153,12 @@ def parse_args(*a, **ka):
         epilog='Used during testing of https://github.com/sio/libvirt-guest.service',
     )
     parser.add_argument(
+        '--control-fifo',
+        metavar='FIFO',
+        default='logger.fifo',
+        help='A FIFO path on which to listen for \'STOP\' message (default: logger.fifo)',
+    )
+    parser.add_argument(
         'template_prefix',
         metavar='SYSTEMD_SERVICE_PREFIX',
         help='Systemd service prefix, e.g. libvirt-guest',
@@ -150,7 +175,7 @@ def parse_args(*a, **ka):
 
 def main():
     args = parse_args()
-    logger = LibvirtSystemdLogger(args.template_prefix, args.domains)
+    logger = LibvirtSystemdLogger(args.template_prefix, args.domains, args.control_fifo)
     logger.run()
 
 
