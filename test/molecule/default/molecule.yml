@@ -25,9 +25,9 @@ provisioner:
       all:
         ansible_python_interpreter: /usr/bin/python3
         guests:
-          - guest-foo
-          - guest-bar
-          - guest-baz
+          - alpha
+          - bravo
+          - charlie
 
 scenario:
   test_sequence:
