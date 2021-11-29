@@ -1,5 +1,20 @@
 - name: copy logger.py
   copy:
     src: '{{ molecule_scenario_directory }}/../../logger.py'
-    dest: /usr/local/bin/test_logger
+    dest: /usr/local/bin/event_logger
     mode: '0755'
+
+- name: create test-event-logger.service
+  register: copy_service
+  copy:
+    dest: /etc/systemd/system/test-event-logger.service
+    content: |
+      [Service]
+      ExecStart=/bin/sh -c "/usr/local/bin/event_logger libvirt-guest {{ guests|join(' ') }} > /events.log"
+      ExecStop=/bin/sh -c "echo STOP > /logger.fifo; sleep 2"
+      WorkingDirectory=/
+
+- name: reload systemd
+  when: copy_service is changed
+  systemd:
+    daemon_reload: yes
