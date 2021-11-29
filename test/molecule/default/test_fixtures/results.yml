@@ -14,6 +14,8 @@
     fail_msg: |
       {{ test_failed|length }} tests failed:
       {{ test_failed | to_nice_yaml }}
+      {{ test_success|length }} tests successful:
+      {{ test_success | to_nice_yaml }}
     success_msg: |
       {{ test_success|length }} tests successful:
       {{ test_success | to_nice_yaml }}
