@@ -7,6 +7,7 @@ import dbus     # python3-dbus
 import json
 import libvirt  # python3-libvirt
 import logging
+import os
 import os.path
 import subprocess
 import sys
@@ -18,9 +19,15 @@ from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
 
 
-logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s', datefmt='%b %d %H:%M:%S')
-log = logging.getLogger(os.path.basename(__file__))
-log.level = logging.DEBUG  # debug
+def configure_logging():
+    msg_format = '%(levelname)-8s %(message)s'
+    if os.getenv('INVOCATION_ID') is None:  # Detect systemd: https://serverfault.com/a/927481
+        msg_format = f'%(asctime)s {msg_format}'
+    logging.basicConfig(format=msg_format, datefmt='%b %d %H:%M:%S')
+    log = logging.getLogger(os.path.basename(__file__))
+    log.level = logging.DEBUG  # debug
+    return log
+log = configure_logging()
 
 
 class ThreadSafeKeyValue(MutableMapping):
