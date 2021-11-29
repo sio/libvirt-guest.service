@@ -16,6 +16,10 @@
     name: alpha
     state: running
 
+- name: wait a little for libvirt-guest-manager to do its job
+  wait_for:
+    timeout: 2
+
 #
 # THEN:
 #
