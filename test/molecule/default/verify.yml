@@ -2,8 +2,14 @@
   become: yes
   gather_facts: no
   tasks:
+    #
+    # TEST CASES
+    #
     - import_tasks: test_cases/01_libvirt_start.yml
       vars:
         test_name: Initiate guest startup from Libvirt
 
+    #
+    # STATUS REPORT FOR THE WHOLE TEST SUITE
+    #
     - import_tasks: test_fixtures/results.yml
