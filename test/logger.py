@@ -12,6 +12,7 @@ import os
 import subprocess
 import threading
 import time
+from datetime import datetime
 
 
 class LibvirtSystemdLogger:
@@ -68,15 +69,18 @@ class LibvirtSystemdLogger:
 
     def record(self, subsystem: str, action: str, domain: str):
         with self.lock:
+            time_unix = self.timestamp()
+            time_utc = datetime.utcfromtimestamp(time_unix).strftime('%b %d %H:%M:%S')
             print(yaml(dict(
-                timestamp=self.timestamp(),
+                time_unix=time_unix,
+                time_utc=time_utc,
                 subsystem=subsystem,
                 action=action,
                 domain=domain,
             )))
 
     def timestamp(self):
-        return time.monotonic()
+        return time.time()
 
     def listen_fifo(self):
         '''Listen for STOP message on control FIFO'''
