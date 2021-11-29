@@ -1,0 +1,47 @@
+- name: 'setup: start specified guests'
+  loop: '{{ test_start_guests|d([]) }}'
+  virt:
+    name: '{{ item }}'
+    state: running
+
+- name: 'setup: stop all other guests'
+  loop: '{{ guests | difference(test_start_guests|d([])) }}'
+  virt:
+    name: '{{ item }}'
+    state: destroyed
+
+- name: 'setup: start specified systemd guest units'
+  loop: '{{ test_start_units|d([]) }}'
+  systemd:
+    name: 'libvirt-guest@{{ item }}.service'
+    state: started
+
+- name: 'setup: stop all other systemd guest units'
+  loop: '{{ guests | difference(test_start_units|d([])) }}'
+  systemd:
+    name: 'libvirt-guest@{{ item }}.service'
+    state: stopped
+
+- name: 'setup: start libvirt-guest-manager'
+  when: test_start_manager|default(False)
+  systemd:
+    name: libvirt-guest-manager.service
+    state: started
+
+- name: 'setup: stop libvirt-guest-manager'
+  when: not test_start_manager|default(False)
+  systemd:
+    name: libvirt-guest-manager.service
+    state: stopped
+
+- name: 'setup: start event logger'
+  when: test_start_event_logger|default(True)
+  systemd:
+    name: test-event-logger
+    state: started
+
+- name: 'setup: stop event logger'
+  when: not test_start_event_logger|default(True)
+  systemd:
+    name: test-event-logger
+    state: stopped

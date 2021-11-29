@@ -1,0 +1,30 @@
+- name: 'teardown: stop event logger'
+  systemd:
+    name: test-event-logger
+    state: stopped
+
+- name: 'teardown: fetch events log'
+  slurp:
+    src: /events.log
+  register: slurp
+
+- name: 'teardown: parse events log'
+  set_fact:
+    test_events: '{{ slurp.content | b64decode | from_yaml }}'
+
+- name: 'teardown: stop libvirt-guest-manager'
+  systemd:
+    name: libvirt-guest-manager.service
+    state: stopped
+
+- name: 'teardown: stop all libvirt guests'
+  loop: '{{ guests }}'
+  virt:
+    name: '{{ item }}'
+    state: destroyed
+
+- name: 'teardown: stop all systemd guest units'
+  loop: '{{ guests }}'
+  systemd:
+    name: 'libvirt-guest@{{ item }}.service'
+    state: stopped
