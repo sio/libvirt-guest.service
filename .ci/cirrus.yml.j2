@@ -6,6 +6,9 @@ task:
   env:
     CLONE_SHA: "{{ GITHUB_SHA }}"
     CLONE_URL: "{{ GITHUB_SERVER_URL }}/{{ GITHUB_REPOSITORY }}.git"
+    CACHE_KEY: "{{ GITHUB_REF }} - cache v1"
+    PIP_CACHE_DIR: $HOME/cache/pip
+    VENVDIR: $HOME/venv
 
   # CI environment does not provide systemd, we have to start the daemons manually
   dbus_background_script:
@@ -20,5 +23,9 @@ task:
   clone_script:
     - git clone "$CLONE_URL" .
     - git reset --hard "$CLONE_SHA"
+  pip_cache:
+    folder: $HOME/cache
+    fingerprint_script:
+      - echo "$CACHE_KEY"
   test_script:
     - make -C test quicktest
