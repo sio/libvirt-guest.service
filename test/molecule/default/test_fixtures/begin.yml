@@ -1,6 +1,6 @@
 - name: 'begin test: execute teardown tasks before first test case'
   when: test_started is not defined
-  import_tasks: test_fixtures/teardown.yml
+  include_tasks: test_fixtures/teardown.yml
 
 - name: 'begin test: create test results container variables'
   set_fact:
