@@ -1,7 +1,7 @@
 task:
   name: libvirt-guest-service-test
   container:
-    container: potyarkin/molecule:host-kvm
+    image: potyarkin/molecule:host-kvm
     kvm: true
   env:
     CLONE_SHA: "{{ GITHUB_SHA }}"
