@@ -25,6 +25,10 @@
       vars:
         test_name: 05_systemd_stop
 
+    - import_tasks: test_cases/06_systemd_restart.yml
+      vars:
+        test_name: 06_systemd_restart
+
     #
     # STATUS REPORT FOR THE WHOLE TEST SUITE
     #
