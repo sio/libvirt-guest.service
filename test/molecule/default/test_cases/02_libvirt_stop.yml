@@ -1,0 +1,48 @@
+#
+# GIVEN:
+#   - libvirt-guest-manager is running
+#   - 'bravo' is started both in Libvirt and Systemd
+#
+- import_tasks: test_fixtures/begin.yml
+- import_tasks: test_fixtures/setup.yml
+  vars:
+    test_start_manager: yes
+    test_start_guests:
+      - bravo
+    test_start_units:
+      - bravo
+
+#
+# WHEN:
+#
+- name: stop guest from libvirt
+  virt:
+    name: bravo
+    state: destroyed
+
+- name: wait a little for libvirt-guest-manager to do its job
+  wait_for:
+    timeout: '{{ test_wait_events }}'
+
+#
+# THEN:
+#
+- import_tasks: test_fixtures/teardown.yml
+
+- name: check assertions
+  ignore_errors: yes
+  register: assertion
+  assert:
+    that:
+      - test_events|length == 2
+      - test_events|selectattr('domain', 'eq', 'bravo')|length == 2
+      - test_events|selectattr('action', 'eq', 'stop')|length == 2
+      - test_events|selectattr('subsystem', 'eq', 'libvirt')|length == 1
+      - test_events|selectattr('subsystem', 'eq', 'systemd')|length == 1
+    msg: '{{ {"test_events": test_events}|to_nice_yaml }}'
+
+- name: register test results
+  set_fact:
+    test_status: '{{ "failed" if assertion is failed else "success" }}'
+
+- import_tasks: test_fixtures/end.yml

@@ -9,6 +9,10 @@
       vars:
         test_name: 01_libvirt_start
 
+    - import_tasks: test_cases/02_libvirt_stop.yml
+      vars:
+        test_name: 02_libvirt_stop
+
     - import_tasks: test_cases/04_systemd_start.yml
       vars:
         test_name: 04_systemd_start
