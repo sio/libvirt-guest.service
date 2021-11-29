@@ -11,7 +11,9 @@
   assert:
     that:
       - test_failed|length == 0
-    quiet: yes
     fail_msg: |
-      Tests failed:
+      {{ test_failed|length }} tests failed:
       {{ test_failed | to_nice_yaml }}
+    success_msg: |
+      {{ test_success|length }} tests successful:
+      {{ test_success | to_nice_yaml }}
