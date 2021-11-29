@@ -17,6 +17,10 @@
       vars:
         test_name: 04_systemd_start
 
+    - import_tasks: test_cases/05_systemd_stop.yml
+      vars:
+        test_name: 05_systemd_stop
+
     #
     # STATUS REPORT FOR THE WHOLE TEST SUITE
     #
