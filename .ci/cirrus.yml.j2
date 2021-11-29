@@ -3,6 +3,8 @@ task:
   container:
     image: potyarkin/molecule:host-kvm
     kvm: true
+    cpu: 4
+    memory: 6G
   env:
     CLONE_SHA: "{{ GITHUB_SHA }}"
     CLONE_URL: "{{ GITHUB_SERVER_URL }}/{{ GITHUB_REPOSITORY }}.git"
