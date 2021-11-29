@@ -1,0 +1,9 @@
+- name: 'end test: {{ test_name }} - record success'
+  when: test_status == 'success'
+  set_fact:
+    test_success: '{{ test_success + [test_name] }}'
+
+- name: 'end test: {{ test_name }} - record failure'
+  when: test_status == 'failed'
+  set_fact:
+    test_failed: '{{ test_failed + [test_name] }}'

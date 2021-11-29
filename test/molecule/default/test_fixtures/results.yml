@@ -1,0 +1,17 @@
+- name: 'test results: check assertions'
+  assert:
+    that:
+      - test_success|length + test_failed|length == test_started|length
+    quiet: yes
+    fail_msg: |
+      Test status was not recorded for the following test cases:
+      {{ test_started | difference(test_success + test_failed) | to_nice_yaml }}
+
+- name: 'test results: report results'
+  assert:
+    that:
+      - test_failed|length == 0
+    quiet: yes
+    fail_msg: |
+      Tests failed:
+      {{ test_failed | to_nice_yaml }}

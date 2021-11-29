@@ -1,0 +1,10 @@
+- name: 'begin test: create test results container variables'
+  set_fact:
+    test_started: '{{ test_started|default([]) }}'
+    test_success: '{{ test_success|default([]) }}'
+    test_failed: '{{ test_failed|default([]) }}'
+    test_status: null  # status of current test case
+
+- name: 'begin test: {{ test_name }}'
+  set_fact:
+    test_started: '{{ test_started + [test_name] }}'
