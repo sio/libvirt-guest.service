@@ -28,6 +28,7 @@ provisioner:
           - alpha
           - bravo
           - charlie
+        test_wait_events: 3  # seconds
 
 scenario:
   test_sequence:

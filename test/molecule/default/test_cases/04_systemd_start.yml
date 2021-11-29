@@ -18,7 +18,7 @@
 
 - name: wait a little for libvirt-guest-manager to do its job
   wait_for:
-    timeout: 2
+    timeout: '{{ test_wait_events }}'
 
 #
 # THEN:
