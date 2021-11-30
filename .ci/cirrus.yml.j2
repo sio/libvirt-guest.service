@@ -3,8 +3,9 @@ task:
   container:
     image: potyarkin/molecule:host-kvm
     kvm: true
-    cpu: 4
-    memory: 6G
+    greedy: true  # https://medium.com/cirruslabs/greedy-instances-29aad06dc2b4
+    cpu: 2        # peak usage 2.6 cpus
+    memory: 5G    # peak usage 3.75G, but 4G is not enough to avoid OOM
   env:
     CLONE_SHA: "{{ GITHUB_SHA }}"
     CLONE_URL: "{{ GITHUB_SERVER_URL }}/{{ GITHUB_REPOSITORY }}.git"
