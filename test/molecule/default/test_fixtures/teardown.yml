@@ -7,10 +7,13 @@
   slurp:
     src: /events.log
   register: slurp
+  changed_when: slurp is failed
+  failed_when: false
 
 - name: 'teardown: parse events log'
   set_fact:
     test_events: '{{ slurp.content | b64decode | from_yaml }}'
+  when: slurp is not changed
 
 - name: 'teardown: stop libvirt-guest-manager'
   systemd:
